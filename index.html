@@ -4,33 +4,39 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>鸣潮排轴共享大厅</title>
-  <script src="https://lib.baomitu.com/vue/3.3.4/vue.global.min.js"></script>
-  <script src="https://lib.baomitu.com/Sortable/1.15.0/Sortable.min.js"></script>
-  <script src="https://s4.zstatic.net/npm/vuedraggable@4.1.0/dist/vuedraggable.umd.min.js"></script>
-  <script src="https://s4.zstatic.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.js"></script>
-  <script src="https://s4.zstatic.net/ajax/libs/tailwindcss/2.2.19/tailwind.min.js"></script>
-
+  <script src="./libs/vue.global.prod.js"></script>
+  <script src="./libs/Sortable.min.js"></script>
+  <script src="./libs/vuedraggable.umd.min.js"></script>
+  <script src="./libs/supabase.js"></script>
+  <script src="./libs/tailwind.min.js"></script>
   <style>
-    /* Vue 加载完之前强制隐藏原始模板 */
-    [v-cloak] { display: none !important; }
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
     body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background-color: #f8fafc; color: #334155; }
-    ::-webkit-scrollbar { width: 4px; height: 4px; }
-    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    ::-webkit-scrollbar { width: 0px; height: 0px; }
+    .sortable-ghost { opacity: 0.4; filter: grayscale(20%); background: #f1f5f9 !important; border: 1px dashed #cbd5e1 !important; }
+    .sortable-drag { cursor: grabbing !important; transform: scale(1.02); filter: drop-shadow(0 10px 15px rgba(0,0,0,0.1)); z-index: 50; }
     .animate-pop { animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
-    @keyframes popIn { 0% { opacity: 0; transform: scale(0.95) translateY(2px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
-    .count-badge { position: absolute; top: -6px; right: -6px; min-width: 16px; height: 16px; line-height: 16px; font-size: 10px; font-weight: 700; text-align: center; background: #ef4444; color: white; border-radius: 999px; padding: 0 4px; pointer-events: none; z-index: 5; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+    @keyframes popIn {
+      0% { opacity: 0; transform: scale(0.95) translateY(2px); }
+      100% { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .count-badge {
+      position: absolute; top: -6px; right: -6px; min-width: 16px; height: 16px; line-height: 16px;
+      font-size: 10px; font-weight: 700; text-align: center; background: #ef4444; color: white; border-radius: 999px;
+      padding: 0 4px; pointer-events: none; z-index: 5; box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    }
     .avatar-img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
     .char-avatar { width: 28px; height: 28px; border-radius: 50%; background: #e2e8f0; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; font-size: 11px; font-weight: 700; color: #94a3b8; }
     .char-avatar-lg { width: 36px; height: 36px; border-radius: 50%; background: #e2e8f0; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; font-size: 13px; font-weight: 700; color: #94a3b8; }
     @media (max-width: 640px) {
+      body { padding: 10px; }
       .mobile-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-      .skill-popup { position: fixed !important; left: 8px !important; right: 8px !important; width: auto !important; top: auto !important; bottom: 8px !important; max-height: 40vh; z-index: 100; overflow-y: auto; }
+      .skill-popup { position: fixed !important; left: 8px !important; right: 8px !important; width: auto !important; top: auto !important; bottom: 8px !important; max-height: 40vh; overflow-y: auto; }
     }
   </style>
 </head>
-<body class="min-h-screen p-4 sm:p-8">
-  <div id="app" class="max-w-[1100px] mx-auto pb-24" v-cloak>
+<body class="min-h-screen p-4 sm:p-8 selection:bg-blue-100">
+  <div id="app" class="max-w-[1100px] mx-auto pb-24">
     
     <div class="sticky flex flex-wrap gap-3 justify-between items-center mb-8 bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-200 top-2 sm:top-4 z-40">
       <div class="flex items-center gap-3">
@@ -42,14 +48,16 @@
       </div>
       
       <div class="flex items-center gap-2 sm:gap-3">
-        <button v-if="viewMode !== 'detail'" @click="fetchTeams" class="bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 px-3 py-2 rounded-lg text-sm font-semibold shadow-sm">
+        <button v-if="viewMode !== 'detail'" @click="fetchTeams" class="bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-800 px-3 py-2 rounded-lg transition-all text-sm font-semibold shadow-sm">
           {{ isLoading ? '刷新中...' : '刷新大厅' }}
         </button>
-        <button v-if="viewMode !== 'detail'" @click="createNewTeam" class="bg-slate-800 text-white px-4 sm:px-5 py-2 rounded-lg hover:bg-slate-700 active:scale-95 shadow-sm font-semibold text-sm">
+        <button v-if="viewMode !== 'detail'" @click="createNewTeam" class="bg-slate-800 text-white px-4 sm:px-5 py-2 rounded-lg hover:bg-slate-700 active:scale-95 transition-all shadow-sm font-semibold text-sm flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
           发布新轴
         </button>
         <template v-if="viewMode === 'detail' && detailTeam">
-          <button @click="publishTeam" class="bg-blue-600 text-white hover:bg-blue-700 px-5 py-2 rounded-lg text-sm font-semibold shadow-sm">
+          <button @click="publishTeam" class="bg-blue-600 text-white hover:bg-blue-700 px-5 py-2 rounded-lg text-sm font-semibold shadow-sm flex items-center gap-1.5 transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
             {{ isSaving ? '发布中...' : '保存并发布' }}
           </button>
         </template>
@@ -57,33 +65,56 @@
     </div>
 
     <div v-if="viewMode === 'grid'" class="animate-pop">
-      <div class="mb-5 relative max-w-sm">
-        <input v-model="searchQuery" class="w-full pl-4 pr-8 py-2.5 text-sm bg-white border border-slate-200 rounded-xl focus:border-slate-400 outline-none shadow-sm" placeholder="搜索队伍、角色或作者…">
+      <div class="mb-5 flex items-center gap-3">
+        <div class="relative flex-1 max-w-sm">
+          <svg class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+          <input v-model="searchQuery" class="w-full pl-9 pr-8 py-2.5 text-sm bg-white border border-slate-200 rounded-xl focus:border-slate-400 outline-none transition-colors shadow-sm" placeholder="搜索队伍名、角色名或作者…">
+        </div>
       </div>
+
+      <div v-if="isLoading && teams.length === 0" class="text-center py-16 text-slate-400 font-medium">加载数据中...</div>
+
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        <div v-for="team in filteredTeams" :key="team.id" class="bg-white rounded-2xl shadow-sm p-5 border border-slate-200 flex flex-col group cursor-pointer" @click="openDetail(team)">
+        <div v-for="team in filteredTeams" :key="team.id" class="bg-white rounded-2xl shadow-sm hover:shadow-md transition-all p-5 sm:p-6 border border-slate-200 flex flex-col group cursor-pointer hover:-translate-y-1" @click="openDetail(team)">
           <div class="flex justify-between items-start mb-2">
-            <h3 class="font-bold text-lg text-slate-800 truncate pr-2">{{ team.name }}</h3>
-            <button @click.stop="toggleLike(team)" class="flex items-center gap-1" :class="hasLiked(team.id) ? 'text-rose-500' : 'text-slate-400'">
+            <h3 class="font-bold text-lg sm:text-xl text-slate-800 truncate pr-2">{{ team.name }}</h3>
+            <button @click.stop="toggleLike(team)" class="flex items-center gap-1 bg-slate-50 hover:bg-rose-50 border border-slate-100 px-2 py-1 rounded-md transition-colors shrink-0" :class="{'text-rose-500': hasLiked(team.id), 'text-slate-400': !hasLiked(team.id)}">
+              <svg class="w-4 h-4" :fill="hasLiked(team.id) ? 'currentColor' : 'none'" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
               <span class="text-xs font-bold">{{ team.likes || 0 }}</span>
-              <svg class="w-4 h-4" :fill="hasLiked(team.id) ? 'currentColor' : 'none'" stroke="currentColor" viewBox="0 0 24 24"><path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
             </button>
           </div>
-          <div class="flex items-center gap-2 mb-3 text-[10px] font-bold">
-            <span class="bg-slate-100 text-slate-500 px-2 py-0.5 rounded border border-slate-200">{{ team.author_name }}</span>
-            <span class="bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded border border-indigo-100">{{ team.difficulty }}</span>
+          
+          <div class="flex items-center gap-2 mb-3">
+            <span class="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded font-semibold border border-slate-200">作者: {{ team.author_name }}</span>
+            <span class="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded font-semibold border border-indigo-100">{{ team.difficulty }}</span>
           </div>
+
           <div class="flex gap-3 mb-4">
             <div v-for="(char, i) in team.chars" :key="i" class="flex items-center gap-1.5">
-              <div class="char-avatar"><img v-if="getAvatar(char)" :src="getAvatar(char)" class="avatar-img" @error="handleImgError"><span v-else>{{ (char || '?')[0] }}</span></div>
-              <span class="text-xs font-bold" :class="CHAR_TEXT_COLORS[i]">{{ char }}</span>
+              <div class="char-avatar">
+                <img v-if="getAvatar(char)" :src="getAvatar(char)" class="avatar-img" @error="handleImgError">
+                <span v-else>{{ (char || '?')[0] }}</span>
+              </div>
+              <span class="text-xs font-bold" :class="CHAR_TEXT_COLORS[i]">{{ char || '?' }}</span>
             </div>
           </div>
-          <div class="mt-auto border-t border-slate-100 pt-3 flex justify-between items-center text-xs text-slate-400">
-            <span class="truncate italic flex-1">{{ team.remark || '暂无备注…' }}</span>
-            <div v-if="team.author_id === deviceId" class="flex gap-2 ml-2 shrink-0 font-bold">
-               <button @click.stop="openDetail(team)" class="text-blue-500">编辑</button>
-               <button @click.stop="deleteTeam(team.id)" class="text-red-400">删除</button>
+          
+          <div class="flex flex-wrap gap-1.5 mb-3">
+             <span v-for="mode in team.modes" :key="mode" class="text-[10px] bg-amber-50 text-amber-600 border border-amber-100 px-1.5 py-0.5 rounded font-medium">{{ mode }}</span>
+          </div>
+
+          <div v-if="team.video" class="mb-3">
+            <a @click.stop :href="team.video" target="_blank" class="text-[11px] px-2 py-1 bg-blue-50 text-blue-600 rounded-md font-semibold hover:bg-blue-100 transition-colors inline-flex items-center gap-1">
+              <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              参考视频
+            </a>
+          </div>
+
+          <div class="mt-auto border-t border-slate-100 pt-3 flex justify-between items-center">
+            <p class="text-xs text-slate-400 line-clamp-1 flex-1 font-medium">{{ team.remark || '暂无备注…' }}</p>
+            <div v-if="team.author_id === deviceId" class="flex gap-2 ml-2 shrink-0">
+               <button @click.stop="openDetail(team)" class="text-xs text-blue-500 font-semibold hover:underline">编辑</button>
+               <button @click.stop="deleteTeam(team.id)" class="text-xs text-red-500 font-semibold hover:underline">删除</button>
             </div>
           </div>
         </div>
@@ -92,63 +123,153 @@
 
     <div v-if="viewMode === 'detail' && detailTeam" class="animate-pop">
       <div class="bg-white rounded-2xl shadow-sm p-5 sm:p-7 border border-slate-200">
+        
+        <div v-if="!isAuthor" class="mb-4 bg-amber-50 border border-amber-200 text-amber-700 p-3 rounded-lg text-sm font-medium flex items-center gap-2">
+          <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          您不是该轴的作者，当前处于只读模式，无法保存修改。
+        </div>
+
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-5 border-b border-slate-100 pb-5">
           <div class="space-y-4">
-            <div><label class="text-xs font-bold text-slate-400 mb-1 block">配队名称</label><input v-model="detailTeam.name" :disabled="!isAuthor" class="font-bold text-xl text-slate-800 w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 outline-none"></div>
-            <div><label class="text-xs font-bold text-slate-400 mb-1 block">角色阵容 (点击框内矩阵选择)</label>
+            <div>
+              <label class="text-xs font-bold text-slate-500 mb-1 block">配队名称</label>
+              <input v-model="detailTeam.name" :disabled="!isAuthor" class="font-bold text-xl text-slate-800 w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 focus:border-blue-400 outline-none" placeholder="输入配队名称">
+            </div>
+            <div>
+              <label class="text-xs font-bold text-slate-500 mb-1 block">作者名称</label>
+              <input v-model="detailTeam.author_name" :disabled="!isAuthor" class="text-sm font-semibold text-slate-700 w-full sm:w-1/2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 outline-none" placeholder="你的名字">
+            </div>
+            <div>
+              <label class="text-xs font-bold text-slate-500 mb-1 block">角色阵容</label>
               <div class="flex flex-wrap gap-4">
+                
                 <div v-for="(char, i) in detailTeam.chars" :key="i" class="relative">
                   <div class="flex items-center gap-2">
-                    <div class="char-avatar-lg"><img v-if="getAvatar(char)" :src="getAvatar(char)" class="avatar-img" @error="handleImgError"><span v-else>{{ (char || '?')[0] }}</span></div>
-                    <button @click.stop="isAuthor && openCharSelect(i)" :disabled="!isAuthor" class="px-3 py-1.5 w-28 text-sm font-bold bg-slate-50 border border-slate-200 rounded-lg" :class="CHAR_TEXT_COLORS[i]">{{ char }}</button>
+                    <div class="char-avatar-lg">
+                      <img v-if="getAvatar(char)" :src="getAvatar(char)" class="avatar-img" @error="handleImgError">
+                      <span v-else>{{ (char || '?')[0] }}</span>
+                    </div>
+                    <button @click.stop="isAuthor && openCharSelect(i)" :disabled="!isAuthor" class="px-3 py-1.5 w-24 sm:w-28 text-sm font-semibold text-center bg-slate-50 border border-slate-200 focus:border-blue-400 rounded-lg outline-none cursor-pointer hover:bg-white truncate transition-colors" :class="CHAR_TEXT_COLORS[i]">
+                      {{ char }}
+                    </button>
                   </div>
-                  <div v-if="activeCharSelectIdx === i" @click.stop class="absolute left-0 top-full mt-2 bg-white border border-slate-200 shadow-2xl rounded-2xl p-4 z-50 w-[300px] sm:w-[360px] animate-pop">
-                    <input v-model="charSearchQuery" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm mb-3 outline-none" placeholder="输入搜索...">
-                    <div class="max-h-[280px] overflow-y-auto grid grid-cols-4 sm:grid-cols-5 gap-1 pr-1">
-                      <button v-for="name in filteredCharOptions" :key="name" @click="selectChar(i, name)" class="flex flex-col items-center gap-1 p-2 hover:bg-slate-100 rounded-lg transition-colors">
-                        <div class="w-10 h-10 rounded-full bg-slate-200 overflow-hidden"><img v-if="getAvatar(name)" :src="getAvatar(name)" @error="handleImgError" class="w-full h-full object-cover"></div>
-                        <span class="text-[10px] font-bold text-slate-600 text-center leading-tight break-all">{{ name }}</span>
+
+                  <div v-if="activeCharSelectIdx === i" @click.stop class="absolute left-0 top-full mt-2 bg-white border border-slate-200 shadow-xl rounded-xl p-3 z-50 w-[300px] sm:w-[340px] animate-pop">
+                    <div class="relative mb-3">
+                      <svg class="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                      <input v-model="charSearchQuery" class="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-2 text-sm outline-none focus:border-blue-400 focus:bg-white transition-colors" placeholder="搜索角色名...">
+                    </div>
+                    <div class="max-h-[240px] overflow-y-auto grid grid-cols-4 gap-2 pr-1">
+                      <button v-for="name in filteredCharOptions" :key="name" @click="selectChar(i, name)" class="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-slate-100 transition-colors active:scale-95">
+                        <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-slate-200 overflow-hidden flex shrink-0 border border-slate-100 shadow-sm">
+                          <img v-if="getAvatar(name)" :src="getAvatar(name)" @error="handleImgError" class="w-full h-full object-cover">
+                        </div>
+                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-700 w-full text-center leading-tight">{{ name }}</span>
                       </button>
                     </div>
+                    <div v-if="filteredCharOptions.length === 0" class="text-center text-xs text-slate-400 py-6 font-medium">没有找到该角色</div>
                   </div>
                 </div>
+
               </div>
             </div>
           </div>
+
           <div class="space-y-4">
-            <div><label class="text-xs font-bold text-slate-400 mb-1 block">排轴难度 (必选)</label>
+            <div>
+              <label class="text-xs font-bold text-slate-500 mb-1 flex items-center gap-1"><span class="text-red-500">*</span> 排轴难度 (必选一项)</label>
               <div class="flex flex-wrap gap-2">
-                <button v-for="diff in DIFFICULTY_OPTIONS" @click="isAuthor && (detailTeam.difficulty = diff)" :class="detailTeam.difficulty === diff ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200'" class="px-3 py-1.5 rounded-lg border text-xs font-bold transition-all">{{ diff }}</button>
+                <label v-for="diff in DIFFICULTY_OPTIONS" :key="diff" class="cursor-pointer">
+                  <input type="radio" v-model="detailTeam.difficulty" :value="diff" :disabled="!isAuthor" class="hidden peer">
+                  <div class="px-3 py-1.5 rounded-lg border text-sm font-semibold transition-colors peer-checked:bg-indigo-600 peer-checked:text-white peer-checked:border-indigo-600 border-slate-200 text-slate-600 bg-white hover:bg-slate-50 peer-disabled:opacity-60 peer-disabled:cursor-not-allowed">
+                    {{ diff }}
+                  </div>
+                </label>
               </div>
             </div>
-            <div><label class="text-xs font-bold text-slate-400 mb-1 block">视频链接</label><input v-model="detailTeam.video" :disabled="!isAuthor" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none" placeholder="B站链接"></div>
+            
+            <div>
+              <label class="text-xs font-bold text-slate-500 mb-1 flex items-center gap-1">适用场景 (可多选)</label>
+              <div class="flex flex-wrap gap-2">
+                <label v-for="mode in MODE_OPTIONS" :key="mode" class="cursor-pointer">
+                  <input type="checkbox" v-model="detailTeam.modes" :value="mode" :disabled="!isAuthor" class="hidden peer">
+                  <div class="px-3 py-1.5 rounded-lg border text-sm font-semibold transition-colors peer-checked:bg-amber-500 peer-checked:text-white peer-checked:border-amber-500 border-slate-200 text-slate-600 bg-white hover:bg-slate-50 peer-disabled:opacity-60 peer-disabled:cursor-not-allowed">
+                    {{ mode }}
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <label class="text-xs font-bold text-slate-500 mb-1 flex items-center gap-1"><span class="text-red-500">*</span> 参考视频链接 (必填)</label>
+              <input v-model="detailTeam.video" :disabled="!isAuthor" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:border-blue-400 outline-none" placeholder="粘贴 B站/YouTube 链接">
+            </div>
           </div>
         </div>
 
+        <div class="mb-5">
+          <label class="text-xs font-bold text-slate-500 mb-1 block">打法备注</label>
+          <textarea v-model="detailTeam.remark" :disabled="!isAuthor" rows="2" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:border-blue-400 outline-none resize-y" placeholder="在此输入配队备注…（例如强制要求角色链数、武器、共鸣效率等）"></textarea>
+        </div>
+
         <div class="space-y-5">
-          <div v-for="axis in ['startup', 'loop']" :key="axis" class="bg-slate-50 rounded-2xl p-4 sm:p-5 border border-slate-100">
-            <div class="flex items-center gap-3 mb-4"><span class="text-sm font-bold text-slate-700">{{ axis === 'startup' ? '启动轴' : '循环轴' }}</span><div class="h-px flex-1 bg-slate-200"></div></div>
+          <div v-for="axis in ['startup', 'loop']" :key="axis" class="bg-slate-50/50 rounded-2xl p-4 sm:p-5 border border-slate-100">
+            <div class="flex items-center gap-3 mb-4">
+              <span class="text-sm font-bold text-slate-700 tracking-wide">{{ axis === 'startup' ? '启动轴' : '循环轴' }}</span>
+              <span class="text-[11px] text-slate-400 font-medium">{{ detailTeam[axis].length }} 步</span>
+              <div class="h-px flex-1 bg-slate-200/60"></div>
+            </div>
+
             <div class="mobile-scroll">
-              <draggable v-model="detailTeam[axis]" :disabled="!isAuthor" group="shared" item-key="id" class="flex flex-wrap items-center min-h-[60px] w-full bg-white border border-slate-200 p-4 rounded-xl shadow-inner">
+              <draggable v-model="detailTeam[axis]" :disabled="!isAuthor" group="shared" item-key="id" :animation="150" class="flex flex-wrap content-start items-center min-h-[56px] w-full pb-2 rounded-xl bg-white border border-slate-200 p-3 sm:p-4 shadow-sm">
                 <template #item="{ element, index }">
-                  <div class="flex items-center shrink-0 mb-2 mr-1.5 relative group">
-                    <div v-if="index > 0 && element.charIdx !== detailTeam[axis][index-1].charIdx" class="mr-2 text-slate-300">/</div>
+                  <div class="relative flex items-center shrink-0 group animate-pop mb-2 mt-1" :style="{cursor: isAuthor ? 'grab' : 'default'}">
+                    <div v-if="index > 0 && element.charIdx !== detailTeam[axis][index-1].charIdx" class="flex items-center mx-2 shrink-0 select-none">
+                      <div class="bg-slate-100 border border-slate-200 text-slate-400 rounded-full p-1 shadow-sm"><svg class="w-3 h-3 sm:w-3.5 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path></svg></div>
+                    </div>
+                    <div v-else-if="index > 0" class="w-1 sm:w-1.5 shrink-0"></div>
                     <div class="relative">
                       <div v-if="element.count > 1" class="count-badge">×{{ element.count }}</div>
-                      <div class="flex items-center px-3 py-1.5 rounded-lg text-white font-bold text-sm shadow-sm" :class="CHAR_BG_COLORS[element.charIdx]" @contextmenu.prevent="isAuthor && adjustCount(element, 1)" @dblclick="isAuthor && adjustCount(element, -1)">
-                        <span class="mr-1 opacity-70 text-[10px]">{{ detailTeam.chars[element.charIdx] }}</span> {{ element.skillKey === 'Custom' ? element.customText : SKILLS[element.skillKey].axisLabel }}
-                        <button v-if="isAuthor" @click.stop="removeStep(detailTeam, axis, index)" class="ml-2">×</button>
+                      <div class="flex items-center px-2.5 sm:px-3 py-1.5 rounded-lg shadow-sm border border-black/5 select-none transition-all duration-150"
+                           :class="[CHAR_BG_COLORS[element.charIdx], isAuthor ? 'hover:-translate-y-0.5 hover:shadow-md' : '']"
+                           @contextmenu.prevent="isAuthor && adjustCount(element, 1)"
+                           @dblclick="isAuthor && adjustCount(element, -1)">
+                        <div v-if="index === 0 || element.charIdx !== detailTeam[axis][index-1].charIdx" class="flex items-center mr-1.5 sm:mr-2">
+                          <div class="w-5 h-5 rounded-full overflow-hidden bg-white/20 flex items-center justify-center mr-1" v-if="getAvatar(detailTeam.chars[element.charIdx])">
+                            <img :src="getAvatar(detailTeam.chars[element.charIdx])" class="w-full h-full object-cover" @error="handleImgError">
+                          </div>
+                          <span class="bg-white/20 px-1.5 sm:px-2 py-0.5 rounded-md text-[10px] sm:text-[11px] font-bold shrink-0 text-white">{{ detailTeam.chars[element.charIdx] || '未命名' }}</span>
+                        </div>
+                        <span class="font-bold tracking-wide text-xs sm:text-sm flex items-center shrink-0 text-white">
+                          {{ element.skillKey === 'Custom' ? element.customText : SKILLS[element.skillKey].axisLabel }}
+                        </span>
+                        <button v-if="isAuthor" @click.stop="removeStep(detailTeam, axis, index)" class="ml-1.5 sm:ml-2 w-4 h-4 flex items-center justify-center rounded-full bg-white/20 hover:bg-red-500 hover:text-white opacity-0 group-hover:opacity-100 transition-all text-white shrink-0">
+                          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
                       </div>
                     </div>
                   </div>
                 </template>
+                <template #footer>
+                  <div v-if="detailTeam[axis].length === 0" class="text-slate-400 text-xs sm:text-sm font-medium w-full text-center pointer-events-none py-1">
+                    {{ isAuthor ? '点击下方按钮录入 · 右键+次数 双击-次数' : '轴为空' }}
+                  </div>
+                </template>
               </draggable>
             </div>
-            <div v-if="isAuthor" class="flex flex-wrap gap-2 mt-3">
+
+            <div v-if="isAuthor" class="flex flex-wrap gap-2 sm:gap-3 relative mt-3">
               <div v-for="(char, i) in detailTeam.chars" :key="i" class="relative">
-                <button @click.stop="toggleMenu(axis, i)" class="px-3 py-2 rounded-lg border text-xs font-bold bg-white" :class="activeMenu.axis === axis && activeMenu.charIdx === i ? 'bg-slate-800 text-white' : 'text-slate-600 border-slate-200'">+ {{ char }}</button>
-                <div v-if="activeMenu.axis === axis && activeMenu.charIdx === i" @click.stop class="skill-popup absolute left-0 top-full mt-2 bg-white border border-slate-200 shadow-2xl rounded-xl p-3 z-50 w-[280px] flex flex-wrap gap-2 animate-pop">
-                  <button v-for="(sk, key) in SKILLS" :key="key" @click="addSkill(axis, i, key)" class="px-3 py-2 rounded-lg text-xs font-bold flex-grow text-white shadow-sm" :class="CHAR_BG_COLORS[i]">{{ sk.menuLabel }}</button>
+                <button @click.stop="toggleMenu(axis, i)" class="px-3 sm:px-4 py-2 rounded-lg border text-xs sm:text-sm font-semibold transition-all relative z-20 flex items-center gap-1.5 bg-white border-slate-200 text-slate-600 hover:bg-slate-50" :class="{'bg-slate-800 border-slate-800 text-white shadow-md hover:bg-slate-800 hover:text-white': activeMenu.axis === axis && activeMenu.charIdx === i}">
+                  <div class="w-4 h-4 rounded-full overflow-hidden bg-slate-200 flex items-center justify-center" v-if="getAvatar(char)">
+                    <img :src="getAvatar(char)" class="w-full h-full object-cover" @error="handleImgError">
+                  </div>
+                  + {{ char || `角色 ${i+1}` }}
+                </button>
+                <div v-if="activeMenu.axis === axis && activeMenu.charIdx === i" @click.stop class="skill-popup absolute left-0 top-full mt-2 bg-white border border-slate-200 shadow-xl rounded-xl p-3 z-50 w-[280px] sm:w-[290px] flex flex-wrap gap-2 animate-pop">
+                  <button v-for="(sk, key) in SKILLS" :key="key" @click="addSkill(axis, i, key)" class="px-3 py-2 rounded-lg text-xs font-semibold transition-all flex-grow text-center text-white shadow-sm hover:opacity-90 active:scale-95" :class="CHAR_BG_COLORS[i]">
+                    {{ sk.menuLabel }}
+                  </button>
                 </div>
               </div>
             </div>
@@ -159,76 +280,288 @@
   </div>
 
   <script>
-    // 强制使用 dbClient 避开全局变量冲突，并修复 CDN 地址
-    const DB_URL = 'https://api.azsw0302.xyz';
-    const DB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd5em91c3VuaGRqeWpkaXlmcWR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjg3NTIsImV4cCI6MjA5MDYwNDc1Mn0.Bi6tZAB7WWXsmkFjQx1XSbLfE4Z3GRI8hQk2U51W4Ao';
-    
-    let dbClient = null;
+    const SUPABASE_URL = 'https://cf-supabase-proxy.azsw0302.xyz';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd5em91c3VuaGRqeWpkaXlmcWR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjg3NTIsImV4cCI6MjA5MDYwNDc1Mn0.Bi6tZAB7WWXsmkFjQx1XSbLfE4Z3GRI8hQk2U51W4Ao';
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    const AVATAR_DICT = {
-      '今汐': 'Jinhsi', '长离': 'Changli', '折枝': 'Zhezhi', '凌阳': 'Lingyang', '安可': 'Encore', '卡卡罗': 'Calcharo', '吟霖': 'Yinlin', '相里要': 'XiangliYao', '忌炎': 'Jiyan', '鉴心': 'Jianxin', '守岸人': 'Shorekeeper', '椿': 'Camellya', '漂泊者：衍射': 'Rover-Spectro', '漂泊者：湮灭': 'Rover-Havoc', '漂泊者：气动': 'Rover-Aero', '维里奈': 'Verina', '散华': 'Sanhua', '白芷': 'Baizhi', '丹瑾': 'Danjin', '莫特斐': 'Mortefi', '渊武': 'Yuanwu', '釉瑚': 'Youhu', '炽霞': 'Chixia', '秧秧': 'Yangyang', '秋水': 'Aalto', '灯灯': 'Lumi', '桃祈': 'Taoqi'
+    const AVATAR_MAP = {
+      '凌阳': 'Lingyang', '折枝': 'Zhezhi', '珂莱塔': 'Carlotta', '安可': 'Encore', '长离': 'Changli',
+      '布兰特': 'Brant', '露帕': 'Lupa', '嘉贝莉娜': 'Galbrena', '莫宁': 'Mornye', '爱弥斯': 'Aemeath',
+      '卡卡罗': 'Calcharo', '吟霖': 'Yinlin', '今汐': 'Jinhsi', '相里要': 'XiangliYao', '奥古斯塔': 'Augusta',
+      '忌炎': 'Jiyan', '鉴心': 'Jianxin', '漂泊者：气动': 'Rover-Aero', '夏空': 'Ciaccona', '卡提希娅': 'Cartethyia',
+      '尤诺': 'Iuno', '仇远': 'Qiuyuan', '西格莉卡': 'Sigrika', '漂泊者：衍射': 'Rover-Spectro', '维里奈': 'Verina',
+      '守岸人': 'Shorekeeper', '菲比': 'Phoebe', '赞妮': 'Zani', '千咲': 'Chisa', '琳奈': 'Lynae',
+      '陆·赫斯': 'LuukHerssen', '椿': 'Camellya', '漂泊者：湮灭': 'Rover-Havoc', '洛可可': 'Roccia',
+      '坎特蕾拉': 'Cantarella', '弗洛洛': 'Phrolova', '散华': 'Sanhua', '白芷': 'Baizhi', '有瑚': 'Youhu',
+      '炽霞': 'Chixia', '莫特斐': 'Mortefi', '渊武': 'Yuanwu', '卜灵': 'Buling', '秧秧': 'Yangyang',
+      '秋水': 'Aalto', '灯灯': 'Lumi', '桃祈': 'Taoqi', '丹瑾': 'Danjin'
     };
 
-    const { createApp, ref, computed, onMounted } = Vue;
     const CHAR_BG_COLORS = ['bg-blue-500', 'bg-violet-500', 'bg-emerald-500'];
     const CHAR_TEXT_COLORS = ['text-blue-600', 'text-violet-600', 'text-emerald-600'];
-    const SKILLS = { 'R': { menuLabel: '💥 R 放', axisLabel: 'R' }, 'E': { menuLabel: '✨ E 技', axisLabel: 'E' }, 'A': { menuLabel: '⚔️ A 普', axisLabel: 'A' }, 'Z': { menuLabel: '☄️ Z 重', axisLabel: 'Z' }, 'Q': { menuLabel: '🐲 Q 骸', axisLabel: 'Q' }, 'F': { menuLabel: '🗡️ F 处决', axisLabel: 'F' }, 'Intro': { menuLabel: '🔄 变奏', axisLabel: '变奏' }, 'Space': { menuLabel: '💨 Space', axisLabel: 'Space' }, 'Custom': { menuLabel: '✍️ 自定义', axisLabel: '自定义' } };
+    const SKILLS = {
+      'R': { menuLabel: '💥 R 放', axisLabel: 'R' },
+      'E': { menuLabel: '✨ E 技', axisLabel: 'E' },
+      'A': { menuLabel: '⚔️ A 普', axisLabel: 'A' },
+      'Z': { menuLabel: '☄️ Z 重', axisLabel: 'Z' },
+      'Q': { menuLabel: '🐲 Q 骸', axisLabel: 'Q' },
+      'F': { menuLabel: '🗡️ F 处决', axisLabel: 'F' },
+      'Intro': { menuLabel: '🔄 变奏', axisLabel: '变奏' },
+      'Space': { menuLabel: '💨 Space', axisLabel: 'Space' },
+      'Custom': { menuLabel: '✍️ 自定义', axisLabel: '自定义' }
+    };
+    
     const DIFFICULTY_OPTIONS = ['轮切轴', '轮椅轴', '进阶轴', '高难轴'];
+    const MODE_OPTIONS = ['深塔', '海墟', '矩阵'];
 
-    const mcApp = createApp({
+    function getDeviceId() {
+      let id = localStorage.getItem('mc_device_id');
+      if (!id) {
+        id = 'dev_' + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+        localStorage.setItem('mc_device_id', id);
+      }
+      return id;
+    }
+
+    const { createApp, ref, computed, onMounted } = Vue;
+
+    const app = createApp({
       setup() {
-        const deviceId = (()=>{ let id = localStorage.getItem('mc_id'); if(!id){ id='dev_'+Math.random().toString(36).substr(2,9); localStorage.setItem('mc_id',id); } return id; })();
-        const teams = ref([]); const userLikes = ref(new Set()); const viewMode = ref('grid'); const detailTeam = ref(null); const searchQuery = ref(''); const activeMenu = ref({ axis: null, charIdx: null }); const activeCharSelectIdx = ref(null); const charSearchQuery = ref(''); const isLoading = ref(false); const isSaving = ref(false);
-        const filteredTeams = computed(() => { if(!searchQuery.value.trim()) return teams.value; const q = searchQuery.value.trim().toLowerCase(); return teams.value.filter(t => t.name.toLowerCase().includes(q) || t.chars.some(c => c.toLowerCase().includes(q))); });
-        const charOptions = Object.keys(AVATAR_DICT);
-        const filteredCharOptions = computed(() => charOptions.filter(n => n.includes(charSearchQuery.value)));
-        const isAuthor = computed(() => detailTeam.value && detailTeam.value.author_id === deviceId);
-        const getAvatar = (name) => AVATAR_DICT[name] ? `./avatars/${AVATAR_DICT[name]}.png` : null;
-        const handleImgError = (e) => e.target.style.display = 'none';
+        const deviceId = getDeviceId();
+        const teams = ref([]);
+        const userLikes = ref(new Set());
+        
+        const viewMode = ref('grid');
+        const detailTeam = ref(null);
+        const searchQuery = ref('');
+        const activeMenu = ref({ axis: null, charIdx: null });
+        
+        // 自定义角色选择器状态
+        const activeCharSelectIdx = ref(null);
+        const charSearchQuery = ref('');
+        const charOptions = Object.keys(AVATAR_MAP);
+        
+        const isLoading = ref(false);
+        const isSaving = ref(false);
 
-        const fetchTeams = async () => { 
-          if(!dbClient) return;
-          isLoading.value = true; 
-          try { 
-            const { data } = await dbClient.from('teams').select('*').order('likes', { ascending: false }); 
-            if(data) teams.value = data; 
-            const { data: ld } = await dbClient.from('user_likes').select('team_id').eq('device_id', deviceId); 
-            if(ld) userLikes.value = new Set(ld.map(l => l.team_id)); 
-          } catch(e){} 
-          isLoading.value = false; 
-        };
-        onMounted(() => { 
-          fetchTeams(); 
-          document.addEventListener('click', () => { activeMenu.value = { axis: null, charIdx: null }; activeCharSelectIdx.value = null; }); 
+        const filteredTeams = computed(() => {
+          if (!searchQuery.value.trim()) return teams.value;
+          const q = searchQuery.value.trim().toLowerCase();
+          return teams.value.filter(t =>
+            t.name.toLowerCase().includes(q) ||
+            t.author_name.toLowerCase().includes(q) ||
+            t.chars.some(c => c.toLowerCase().includes(q)) ||
+            (t.remark && t.remark.toLowerCase().includes(q))
+          );
         });
 
-        const openDetail = (t) => { detailTeam.value = JSON.parse(JSON.stringify(t)); viewMode.value = 'detail'; window.scrollTo(0,0); };
-        const backToGrid = () => { viewMode.value = 'grid'; detailTeam.value = null; };
-        const openCharSelect = (i) => { activeCharSelectIdx.value = i; charSearchQuery.value = ''; };
-        const selectChar = (i, n) => { detailTeam.value.chars[i] = n; activeCharSelectIdx.value = null; };
-        const createNewTeam = () => { detailTeam.value = { author_id: deviceId, author_name: '漂泊者', name: '新配队', chars: ['角色1', '角色2', '角色3'], remark: '', video: '', difficulty: '轮切轴', modes: [], startup: [], loop: [] }; viewMode.value = 'detail'; };
-        const publishTeam = async () => { if(!isAuthor.value || !dbClient) return; isSaving.value = true; const { error } = await dbClient.from('teams').upsert(detailTeam.value); isSaving.value = false; if(!error){ alert('发布成功'); fetchTeams(); backToGrid(); } };
-        const deleteTeam = async (id) => { if(confirm('确认删除？') && dbClient){ await dbClient.from('teams').delete().eq('id', id); fetchTeams(); } };
-        const hasLiked = (id) => userLikes.value.has(id);
-        const toggleLike = async (t) => { if(!dbClient) return; const liked = hasLiked(t.id); if(liked){ userLikes.value.delete(t.id); t.likes--; } else { userLikes.value.add(t.id); t.likes++; } await dbClient.rpc('toggle_like', { p_team_id: t.id, p_device_id: deviceId }); };
-        const toggleMenu = (a, i) => { activeMenu.value = (activeMenu.value.axis===a && activeMenu.value.charIdx===i) ? {axis:null,charIdx:null} : {axis:a, charIdx:i}; };
-        const addSkill = (a, i, k) => { let txt = ""; if(k==='Custom'){ txt = prompt("名称："); if(!txt) return; } detailTeam.value[a].push({ id: Math.random(), charIdx: i, skillKey: k, customText: txt, count: 1 }); activeMenu.value = {axis:null,charIdx:null}; };
-        const adjustCount = (e, d) => { let n = (e.count||1)+d; if(n>=1 && n<=9) e.count = n; };
-        const removeStep = (t, a, i) => t[a].splice(i,1);
+        const filteredCharOptions = computed(() => {
+          if (!charSearchQuery.value.trim()) return charOptions;
+          const q = charSearchQuery.value.trim().toLowerCase();
+          return charOptions.filter(name => name.toLowerCase().includes(q));
+        });
 
-        return { deviceId, teams, filteredTeams, viewMode, detailTeam, searchQuery, activeMenu, activeCharSelectIdx, charSearchQuery, filteredCharOptions, isLoading, isSaving, isAuthor, DIFFICULTY_OPTIONS, CHAR_BG_COLORS, CHAR_TEXT_COLORS, SKILLS, fetchTeams, createNewTeam, openDetail, backToGrid, openCharSelect, selectChar, publishTeam, deleteTeam, hasLiked, toggleLike, getAvatar, handleImgError, toggleMenu, addSkill, adjustCount, removeStep };
+        const isAuthor = computed(() => {
+          return detailTeam.value && detailTeam.value.author_id === deviceId;
+        });
+
+        const getAvatar = (name) => {
+          const key = AVATAR_MAP[name];
+          return key ? `./avatars/${key}.png` : null;
+        };
+        
+        const handleImgError = (e) => {
+          e.target.style.display = 'none';
+        };
+
+        const fetchTeams = async () => {
+          isLoading.value = true;
+          const { data, error } = await supabaseClient
+            .from('teams')
+            .select('*')
+            .order('likes', { ascending: false })
+            .order('created_at', { ascending: false });
+            
+          if (!error && data) {
+            teams.value = data;
+          }
+          
+          const { data: likesData } = await supabaseClient
+            .from('user_likes')
+            .select('team_id')
+            .eq('device_id', deviceId);
+            
+          if (likesData) {
+            userLikes.value = new Set(likesData.map(l => l.team_id));
+          }
+          
+          isLoading.value = false;
+        };
+
+        onMounted(() => {
+          fetchTeams();
+          // 用全局监听器完美替代隐形遮罩，彻底解决点击穿透和无响应问题
+          document.addEventListener('click', () => {
+            closeMenu();
+            closeCharSelect();
+          });
+        });
+
+        const createNewTeam = () => {
+          detailTeam.value = {
+            id: null,
+            author_id: deviceId,
+            author_name: localStorage.getItem('mc_author_name') || '漂泊者',
+            name: '',
+            chars: ['主C', '副C', '生存位'],
+            remark: '',
+            video: '',
+            difficulty: '',
+            modes: [],
+            startup: [],
+            loop: []
+          };
+          viewMode.value = 'detail';
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        const openDetail = (team) => {
+          detailTeam.value = JSON.parse(JSON.stringify(team));
+          viewMode.value = 'detail';
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        const backToGrid = () => {
+          viewMode.value = 'grid';
+          detailTeam.value = null;
+          closeMenu();
+          closeCharSelect();
+        };
+
+        const openCharSelect = (idx) => {
+          activeCharSelectIdx.value = idx;
+          charSearchQuery.value = '';
+        };
+        const closeCharSelect = () => {
+          activeCharSelectIdx.value = null;
+        };
+        const selectChar = (idx, name) => {
+          detailTeam.value.chars[idx] = name;
+          closeCharSelect();
+        };
+
+        const publishTeam = async () => {
+          if (!isAuthor.value) return;
+          
+          const t = detailTeam.value;
+          if (!t.name.trim()) return alert('请输入配队名称');
+          if (!t.difficulty) return alert('请选择排轴难度 (必填)');
+          if (!t.video.trim()) return alert('请提供参考视频链接 (必填)');
+          
+          localStorage.setItem('mc_author_name', t.author_name);
+
+          isSaving.value = true;
+          
+          const payload = {
+            author_id: t.author_id,
+            author_name: t.author_name || '漂泊者',
+            name: t.name,
+            chars: t.chars,
+            remark: t.remark,
+            video: t.video,
+            difficulty: t.difficulty,
+            modes: t.modes,
+            startup: t.startup,
+            loop: t.loop
+          };
+          
+          if (t.id) payload.id = t.id;
+          
+          const { error } = await supabaseClient.from('teams').upsert(payload);
+          
+          isSaving.value = false;
+          
+          if (error) {
+            alert('发布失败: ' + error.message);
+          } else {
+            alert('发布成功！');
+            fetchTeams();
+            backToGrid();
+          }
+        };
+
+        const deleteTeam = async (id) => {
+          if (!confirm('确定要删除这个配队吗？操作不可逆。')) return;
+          const { error } = await supabaseClient.from('teams').delete().eq('id', id).eq('author_id', deviceId);
+          if (!error) {
+            teams.value = teams.value.filter(t => t.id !== id);
+          } else {
+            alert('删除失败: ' + error.message);
+          }
+        };
+
+        const hasLiked = (teamId) => userLikes.value.has(teamId);
+
+        const toggleLike = async (team) => {
+          const currentlyLiked = hasLiked(team.id);
+          if (currentlyLiked) {
+            userLikes.value.delete(team.id);
+            team.likes--;
+          } else {
+            userLikes.value.add(team.id);
+            team.likes++;
+          }
+          
+          const { data, error } = await supabaseClient.rpc('toggle_like', {
+            p_team_id: team.id,
+            p_device_id: deviceId
+          });
+          
+          if (error) {
+            if (currentlyLiked) { userLikes.value.add(team.id); team.likes++; }
+            else { userLikes.value.delete(team.id); team.likes--; }
+          }
+        };
+
+        const toggleMenu = (axis, charIdx) => {
+          if (activeMenu.value.axis === axis && activeMenu.value.charIdx === charIdx) closeMenu();
+          else activeMenu.value = { axis, charIdx };
+        };
+        const closeMenu = () => { activeMenu.value = { axis: null, charIdx: null }; };
+
+        const addSkill = (axis, charIdx, skillKey) => {
+          let customText = "";
+          if (skillKey === 'Custom') {
+            customText = window.prompt("刻录自定义键位名称（如：闪避、延时）：");
+            if (!customText || !customText.trim()) return;
+            customText = customText.trim();
+          }
+          detailTeam.value[axis].push({ id: Math.random().toString(), charIdx, skillKey, customText, count: 1 });
+          closeMenu();
+        };
+
+        const adjustCount = (element, delta) => {
+          const n = (element.count || 1) + delta;
+          if (n >= 1 && n <= 99) element.count = n;
+        };
+
+        const removeStep = (team, axis, index) => { team[axis].splice(index, 1); };
+
+        return {
+          deviceId, teams, filteredTeams, viewMode, detailTeam, searchQuery, activeMenu,
+          activeCharSelectIdx, charSearchQuery, filteredCharOptions,
+          isLoading, isSaving, isAuthor,
+          DIFFICULTY_OPTIONS, MODE_OPTIONS, CHAR_BG_COLORS, CHAR_TEXT_COLORS, SKILLS,
+          fetchTeams, createNewTeam, openDetail, backToGrid, publishTeam, deleteTeam,
+          hasLiked, toggleLike, getAvatar, handleImgError,
+          toggleMenu, closeMenu, addSkill, adjustCount, removeStep,
+          openCharSelect, closeCharSelect, selectChar
+        };
       }
     });
 
-    window.addEventListener('load', () => {
-      // 这里的 window.supabase 是由 CDN 库文件生成的
-      if (window.supabase) {
-        dbClient = window.supabase.createClient(DB_URL, DB_KEY);
-      } else {
-        console.error("Supabase 库文件未能正确加载，可能是 CDN 地址 404 了");
-      }
-      mcApp.component('draggable', vuedraggable).mount('#app');
-    });
+    app.component('draggable', vuedraggable);
+    app.mount('#app');
   </script>
 </body>
 </html>
