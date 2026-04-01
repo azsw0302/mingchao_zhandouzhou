@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>鸣潮排轴共享工具</title>
+  <title>鸣潮排轴共享大厅</title>
   <script src="https://cdn.staticfile.net/vue/3.3.4/vue.global.min.js"></script>
   <script src="https://cdn.staticfile.net/Sortable/1.15.0/Sortable.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/vuedraggable@4.1.0/dist/vuedraggable.umd.min.js"></script>
@@ -262,10 +262,10 @@
   </div>
 
   <script>
-    // 初始化 Supabase
+    // 更改了变量名为 supabaseClient，避开 CDN 内置变量冲突
     const SUPABASE_URL = 'https://gyzousunhdjyjdiyfqdv.supabase.co';
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd5em91c3VuaGRqeWpkaXlmcWR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjg3NTIsImV4cCI6MjA5MDYwNDc1Mn0.Bi6tZAB7WWXsmkFjQx1XSbLfE4Z3GRI8hQk2U51W4Ao';
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     // 头像字典
     const AVATAR_MAP = {
@@ -314,7 +314,7 @@
       setup() {
         const deviceId = getDeviceId();
         const teams = ref([]);
-        const userLikes = ref(new Set()); // 当前设备点赞过的 team_id
+        const userLikes = ref(new Set());
         
         const viewMode = ref('grid');
         const detailTeam = ref(null);
@@ -350,8 +350,7 @@
 
         const fetchTeams = async () => {
           isLoading.value = true;
-          // 拉取配队数据
-          const { data, error } = await supabase
+          const { data, error } = await supabaseClient
             .from('teams')
             .select('*')
             .order('likes', { ascending: false })
@@ -361,8 +360,7 @@
             teams.value = data;
           }
           
-          // 拉取当前设备的点赞记录
-          const { data: likesData } = await supabase
+          const { data: likesData } = await supabaseClient
             .from('user_likes')
             .select('team_id')
             .eq('device_id', deviceId);
@@ -380,7 +378,7 @@
 
         const createNewTeam = () => {
           detailTeam.value = {
-            id: null, // null 代表新建，发布时由后端生成
+            id: null,
             author_id: deviceId,
             author_name: localStorage.getItem('mc_author_name') || '漂泊者',
             name: '',
@@ -397,7 +395,7 @@
         };
 
         const openDetail = (team) => {
-          detailTeam.value = JSON.parse(JSON.stringify(team)); // 深拷贝防止直接污染外部列表
+          detailTeam.value = JSON.parse(JSON.stringify(team));
           viewMode.value = 'detail';
           window.scrollTo({ top: 0, behavior: 'smooth' });
         };
@@ -416,7 +414,6 @@
           if (!t.difficulty) return alert('请选择排轴难度 (必填)');
           if (!t.video.trim()) return alert('请提供参考视频链接 (必填)');
           
-          // 记录作者常用名
           localStorage.setItem('mc_author_name', t.author_name);
 
           isSaving.value = true;
@@ -434,9 +431,9 @@
             loop: t.loop
           };
           
-          if (t.id) payload.id = t.id; // 如果有ID说明是更新
+          if (t.id) payload.id = t.id;
           
-          const { error } = await supabase.from('teams').upsert(payload);
+          const { error } = await supabaseClient.from('teams').upsert(payload);
           
           isSaving.value = false;
           
@@ -451,7 +448,7 @@
 
         const deleteTeam = async (id) => {
           if (!confirm('确定要删除这个配队吗？操作不可逆。')) return;
-          const { error } = await supabase.from('teams').delete().eq('id', id).eq('author_id', deviceId);
+          const { error } = await supabaseClient.from('teams').delete().eq('id', id).eq('author_id', deviceId);
           if (!error) {
             teams.value = teams.value.filter(t => t.id !== id);
           } else {
@@ -463,7 +460,6 @@
 
         const toggleLike = async (team) => {
           const currentlyLiked = hasLiked(team.id);
-          // 乐观更新 UI
           if (currentlyLiked) {
             userLikes.value.delete(team.id);
             team.likes--;
@@ -472,13 +468,12 @@
             team.likes++;
           }
           
-          const { data, error } = await supabase.rpc('toggle_like', {
+          const { data, error } = await supabaseClient.rpc('toggle_like', {
             p_team_id: team.id,
             p_device_id: deviceId
           });
           
           if (error) {
-            // 回滚
             if (currentlyLiked) { userLikes.value.add(team.id); team.likes++; }
             else { userLikes.value.delete(team.id); team.likes--; }
           }
