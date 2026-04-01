@@ -39,6 +39,7 @@
   <div id="app" class="max-w-[1100px] mx-auto pb-24">
     
     <div v-if="activeMenu.axis" class="fixed inset-0 z-10" @click="closeMenu"></div>
+    <div v-if="activeCharSelectIdx !== null" class="fixed inset-0 z-30" @click="closeCharSelect"></div>
 
     <div class="sticky flex flex-wrap gap-3 justify-between items-center mb-8 bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-200 top-2 sm:top-4 z-40">
       <div class="flex items-center gap-3">
@@ -46,9 +47,7 @@
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path></svg>
         </button>
         <div class="w-1.5 h-7 bg-slate-800 rounded-full"></div>
-        <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-slate-800">
-          鸣潮排轴共享大厅
-        </h1>
+        <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-slate-800">鸣潮排轴共享大厅</h1>
       </div>
       
       <div class="flex items-center gap-2 sm:gap-3">
@@ -146,16 +145,35 @@
             <div>
               <label class="text-xs font-bold text-slate-500 mb-1 block">角色阵容</label>
               <div class="flex flex-wrap gap-4">
-                <div v-for="(char, i) in detailTeam.chars" :key="i" class="flex items-center gap-2">
-                  <div class="char-avatar-lg">
-                    <img v-if="getAvatar(char)" :src="getAvatar(char)" class="avatar-img" @error="handleImgError">
-                    <span v-else>{{ (char || '?')[0] }}</span>
+                
+                <div v-for="(char, i) in detailTeam.chars" :key="i" class="relative">
+                  <div class="flex items-center gap-2">
+                    <div class="char-avatar-lg">
+                      <img v-if="getAvatar(char)" :src="getAvatar(char)" class="avatar-img" @error="handleImgError">
+                      <span v-else>{{ (char || '?')[0] }}</span>
+                    </div>
+                    <button @click="isAuthor && openCharSelect(i)" :disabled="!isAuthor" class="px-3 py-1.5 w-24 sm:w-28 text-sm font-semibold text-center bg-slate-50 border border-slate-200 focus:border-blue-400 rounded-lg outline-none cursor-pointer hover:bg-white truncate transition-colors" :class="CHAR_TEXT_COLORS[i]">
+                      {{ char }}
+                    </button>
                   </div>
-                  <input list="char-options" v-model="detailTeam.chars[i]" :disabled="!isAuthor" placeholder="角色名" class="px-3 py-1.5 w-24 sm:w-28 text-sm font-semibold text-center bg-slate-50 border border-slate-200 focus:border-blue-400 rounded-lg outline-none" :class="CHAR_TEXT_COLORS[i]">
+
+                  <div v-if="activeCharSelectIdx === i" class="absolute left-0 top-full mt-2 bg-white border border-slate-200 shadow-xl rounded-xl p-3 z-50 w-[280px] sm:w-[320px] animate-pop">
+                    <div class="relative mb-3">
+                      <svg class="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                      <input v-model="charSearchQuery" class="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-2 text-sm outline-none focus:border-blue-400 focus:bg-white transition-colors" placeholder="搜索角色名...">
+                    </div>
+                    <div class="max-h-[240px] overflow-y-auto grid grid-cols-4 gap-2 pr-1">
+                      <button v-for="name in filteredCharOptions" :key="name" @click="selectChar(i, name)" class="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-slate-100 transition-colors active:scale-95">
+                        <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-slate-200 overflow-hidden flex shrink-0 border border-slate-100 shadow-sm">
+                          <img v-if="getAvatar(name)" :src="getAvatar(name)" @error="handleImgError" class="w-full h-full object-cover">
+                        </div>
+                        <span class="text-[11px] sm:text-xs font-bold text-slate-700 w-full truncate text-center">{{ name }}</span>
+                      </button>
+                    </div>
+                    <div v-if="filteredCharOptions.length === 0" class="text-center text-xs text-slate-400 py-6 font-medium">没有找到该角色</div>
+                  </div>
                 </div>
-                <datalist id="char-options">
-                  <option v-for="name in charOptions" :key="name" :value="name"></option>
-                </datalist>
+
               </div>
             </div>
           </div>
@@ -321,10 +339,13 @@
         const searchQuery = ref('');
         const activeMenu = ref({ axis: null, charIdx: null });
         
+        // 自定义角色选择器状态
+        const activeCharSelectIdx = ref(null);
+        const charSearchQuery = ref('');
+        const charOptions = Object.keys(AVATAR_MAP);
+        
         const isLoading = ref(false);
         const isSaving = ref(false);
-
-        const charOptions = Object.keys(AVATAR_MAP);
 
         const filteredTeams = computed(() => {
           if (!searchQuery.value.trim()) return teams.value;
@@ -335,6 +356,12 @@
             t.chars.some(c => c.toLowerCase().includes(q)) ||
             (t.remark && t.remark.toLowerCase().includes(q))
           );
+        });
+
+        const filteredCharOptions = computed(() => {
+          if (!charSearchQuery.value.trim()) return charOptions;
+          const q = charSearchQuery.value.trim().toLowerCase();
+          return charOptions.filter(name => name.toLowerCase().includes(q));
         });
 
         const isAuthor = computed(() => {
@@ -406,6 +433,20 @@
           viewMode.value = 'grid';
           detailTeam.value = null;
           closeMenu();
+          closeCharSelect();
+        };
+
+        // 角色选择器逻辑
+        const openCharSelect = (idx) => {
+          activeCharSelectIdx.value = idx;
+          charSearchQuery.value = '';
+        };
+        const closeCharSelect = () => {
+          activeCharSelectIdx.value = null;
+        };
+        const selectChar = (idx, name) => {
+          detailTeam.value.chars[idx] = name;
+          closeCharSelect();
         };
 
         const publishTeam = async () => {
@@ -495,7 +536,7 @@
             customText = customText.trim();
           }
           detailTeam.value[axis].push({ id: Math.random().toString(), charIdx, skillKey, customText, count: 1 });
-          closeMenu(); // 添加技能后自动关闭菜单，体验更好
+          closeMenu();
         };
 
         const adjustCount = (element, delta) => {
@@ -507,11 +548,13 @@
 
         return {
           deviceId, teams, filteredTeams, viewMode, detailTeam, searchQuery, activeMenu,
-          isLoading, isSaving, isAuthor, charOptions,
+          activeCharSelectIdx, charSearchQuery, filteredCharOptions,
+          isLoading, isSaving, isAuthor,
           DIFFICULTY_OPTIONS, MODE_OPTIONS, CHAR_BG_COLORS, CHAR_TEXT_COLORS, SKILLS,
           fetchTeams, createNewTeam, openDetail, backToGrid, publishTeam, deleteTeam,
           hasLiked, toggleLike, getAvatar, handleImgError,
-          toggleMenu, closeMenu, addSkill, adjustCount, removeStep
+          toggleMenu, closeMenu, addSkill, adjustCount, removeStep,
+          openCharSelect, closeCharSelect, selectChar
         };
       }
     });
