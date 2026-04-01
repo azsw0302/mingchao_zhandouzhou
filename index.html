@@ -3,15 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>鸣潮排轴共享大厅</title>
+  <title>鸣潮队伍手法轴共享平台</title>
   <script src="./libs/vue.global.prod.js"></script>
   <script src="./libs/Sortable.min.js"></script>
   <script src="./libs/vuedraggable.umd.min.js"></script>
   <script src="./libs/supabase.js"></script>
   <script src="./libs/tailwind.min.js"></script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background-color: #f8fafc; color: #334155; }
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap');
+    body { font-family: 'Noto Sans SC', system-ui, -apple-system, sans-serif; background-color: #f8fafc; color: #334155; }
     ::-webkit-scrollbar { width: 0px; height: 0px; }
     .show-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
     .show-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
@@ -30,13 +30,19 @@
       padding: 0 4px; pointer-events: none; z-index: 5; box-shadow: 0 1px 3px rgba(0,0,0,0.15);
     }
     .avatar-img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
-    .char-avatar { width: 28px; height: 28px; border-radius: 50%; background: #e2e8f0; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; font-size: 11px; font-weight: 700; color: #94a3b8; }
+    .char-avatar { width: 36px; height: 36px; border-radius: 50%; background: #e2e8f0; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; font-size: 13px; font-weight: 700; color: #94a3b8; }
     .char-avatar-lg { width: 36px; height: 36px; border-radius: 50%; background: #e2e8f0; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; font-size: 13px; font-weight: 700; color: #94a3b8; }
     
     .seg-bubble { position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); background: white; border: 1px solid #e2e8f0; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); border-radius: 8px; padding: 4px; display: flex; gap: 4px; z-index: 60; }
     .seg-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; border-radius: 6px; transition: all 0.15s; }
     .seg-btn:hover { background: #f1f5f9; }
     .seg-btn.active { background: #334155; color: white; }
+
+    /* Toast通知 */
+    .toast-enter { animation: toastIn 0.3s ease forwards; }
+    .toast-leave { animation: toastOut 0.3s ease forwards; }
+    @keyframes toastIn { from { opacity: 0; transform: translateX(100%); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes toastOut { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(100%); } }
 
     /* 筛选面板动画 */
     .filter-panel { overflow: hidden; transition: max-height 0.3s ease, opacity 0.3s ease; }
@@ -63,11 +69,11 @@
     <!-- 顶部导航栏 -->
     <div class="sticky flex flex-wrap gap-3 justify-between items-center mb-6 bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-200 top-2 sm:top-4 z-40">
       <div class="flex items-center gap-3">
-        <button v-if="viewMode === 'detail' || viewMode === 'view'" @click="backToGrid" class="flex items-center gap-1.5 text-slate-500 hover:text-slate-800 transition-colors mr-1">
+        <button v-if="viewMode === 'detail' || viewMode === 'view' || viewMode === 'admin'" @click="backToGrid" class="flex items-center gap-1.5 text-slate-500 hover:text-slate-800 transition-colors mr-1">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path></svg>
         </button>
         <div class="w-1.5 h-7 bg-slate-800 rounded-full"></div>
-        <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-slate-800">鸣潮排轴共享大厅</h1>
+        <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-slate-800">鸣潮队伍手法轴共享平台</h1>
       </div>
       
       <div class="flex items-center gap-2 sm:gap-3">
@@ -196,47 +202,59 @@
 
       <div v-if="isLoading && teams.length === 0" class="text-center py-16 text-slate-400 font-medium">加载数据中...</div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        <div v-for="team in filteredAndSortedTeams" :key="team.id" class="bg-white rounded-2xl shadow-sm hover:shadow-md transition-all p-5 sm:p-6 border border-slate-200 flex flex-col group cursor-pointer hover:-translate-y-1" @click="openView(team)">
-          <div class="flex justify-between items-start mb-2">
-            <h3 class="font-bold text-lg sm:text-xl text-slate-800 truncate pr-2">{{ team.name }}</h3>
-            <button @click.stop="toggleLike(team)" class="flex items-center gap-1 bg-slate-50 hover:bg-rose-50 border border-slate-100 px-2 py-1 rounded-md transition-colors shrink-0" :class="{'text-rose-500': hasLiked(team.id), 'text-slate-400': !hasLiked(team.id)}">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div v-for="team in filteredAndSortedTeams" :key="team.id"
+          class="bg-white rounded-2xl shadow-sm hover:shadow-md transition-all p-6 sm:p-7 border border-slate-200 flex flex-col group cursor-pointer hover:-translate-y-1"
+          @click="openView(team)">
+          <div class="flex justify-between items-start mb-3">
+            <h3 class="font-bold text-xl sm:text-2xl text-slate-800 truncate pr-2">{{ team.name }}</h3>
+            <button @click.stop="toggleLike(team)" class="flex items-center gap-1.5 bg-slate-50 hover:bg-rose-50 border border-slate-100 px-2.5 py-1.5 rounded-lg transition-colors shrink-0" :class="{'text-rose-500': hasLiked(team.id), 'text-slate-400': !hasLiked(team.id)}">
               <svg class="w-4 h-4" :fill="hasLiked(team.id) ? 'currentColor' : 'none'" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
               <span class="text-xs font-bold">{{ team.likes || 0 }}</span>
             </button>
           </div>
-          
-          <div class="flex items-center gap-2 mb-3">
-            <span class="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded font-semibold border border-slate-200">作者: {{ team.author_name }}</span>
-            <span class="text-[10px] px-2 py-0.5 rounded font-semibold border" :class="DIFFICULTY_TAG_COLORS[team.difficulty] || 'bg-slate-50 text-slate-500 border-slate-200'">{{ team.difficulty }}</span>
+
+          <!-- 难度标签突出展示 + 作者 -->
+          <div class="flex items-center gap-2 mb-4">
+            <span class="text-xs font-black px-3 py-1 rounded-lg border-2 tracking-wide" :class="DIFFICULTY_TAG_COLORS[team.difficulty] || 'bg-slate-50 text-slate-500 border-slate-200'">{{ team.difficulty }}</span>
+            <span class="text-[11px] bg-slate-100 text-slate-500 px-2.5 py-1 rounded-lg font-semibold border border-slate-200">{{ team.author_name }}</span>
+            <div class="flex flex-wrap gap-1.5 ml-auto">
+              <span v-for="mode in team.modes" :key="mode"
+                class="text-[10px] border px-1.5 py-0.5 rounded-md font-semibold"
+                :class="MODE_TAG_COLORS[mode] || 'bg-amber-50 text-amber-600 border-amber-100'">
+                {{ mode }}
+              </span>
+            </div>
           </div>
 
-          <div class="flex gap-3 mb-4">
-            <div v-for="(char, i) in team.chars" :key="i" class="flex items-center gap-1.5">
+          <!-- 角色阵容 - 头像放大 -->
+          <div class="flex gap-4 mb-5">
+            <div v-for="(char, i) in team.chars" :key="i" class="flex items-center gap-2">
               <div class="char-avatar">
                 <img v-if="getAvatar(char)" :src="getAvatar(char)" class="avatar-img" @error="handleImgError">
                 <span v-else>{{ (char || '?')[0] }}</span>
               </div>
-              <span class="text-xs font-bold" :class="CHAR_TEXT_COLORS[i]">{{ char || '?' }}</span>
+              <span class="text-sm font-bold" :class="CHAR_TEXT_COLORS[i]">{{ char || '?' }}</span>
             </div>
-          </div>
-          
-          <div class="flex flex-wrap gap-1.5 mb-3">
-             <span v-for="mode in team.modes" :key="mode" 
-                   class="text-[10px] border px-1.5 py-0.5 rounded font-medium"
-                   :class="MODE_TAG_COLORS[mode] || 'bg-amber-50 text-amber-600 border-amber-100'">
-               {{ mode }}
-             </span>
           </div>
 
           <div class="mt-auto border-t border-slate-100 pt-3 flex justify-between items-center">
-            <p class="text-xs text-slate-400 line-clamp-1 flex-1 font-medium">{{ team.remark || '暂无备注…' }}</p>
+            <div class="flex flex-col gap-0.5 flex-1 min-w-0">
+              <p class="text-xs text-slate-400 line-clamp-1 font-medium">{{ team.remark || '暂无备注…' }}</p>
+              <span class="text-[10px] text-slate-300 font-medium">{{ relativeTime(team.created_at) }}</span>
+            </div>
             <div v-if="team.author_id === deviceId || isAdmin" class="flex gap-2 ml-2 shrink-0">
-               <button @click.stop="openDetail(team)" class="text-xs text-blue-500 font-semibold hover:underline">编辑</button>
-               <button @click.stop="deleteTeam(team.id)" class="text-xs text-red-500 font-semibold hover:underline">删除</button>
+              <button @click.stop="openDetail(team)" class="text-xs text-blue-500 font-semibold hover:underline">编辑</button>
+              <button @click.stop="deleteTeam(team.id)" class="text-xs text-red-500 font-semibold hover:underline">删除</button>
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- 无限滚动触发器 -->
+      <div ref="scrollSentinel" class="h-8 flex items-center justify-center mt-2">
+        <span v-if="isLoadingMore" class="text-xs text-slate-400 font-medium">加载更多...</span>
+        <span v-else-if="noMoreData && teams.length > 0" class="text-xs text-slate-300 font-medium">已加载全部内容</span>
       </div>
 
       <div v-if="!isLoading && filteredAndSortedTeams.length === 0" class="text-center py-16 text-slate-400 font-medium">
@@ -257,10 +275,16 @@
               <span class="text-xs bg-slate-100 text-slate-500 px-2.5 py-1 rounded-lg font-semibold border border-slate-200">作者: {{ viewTeam.author_name }}</span>
               <span class="text-xs px-2.5 py-1 rounded-lg font-semibold border" :class="DIFFICULTY_TAG_COLORS[viewTeam.difficulty] || 'bg-slate-50 text-slate-500 border-slate-200'">{{ viewTeam.difficulty }}</span>
               <span v-for="mode in viewTeam.modes" :key="mode" class="text-xs border px-2.5 py-1 rounded-lg font-semibold" :class="MODE_TAG_COLORS[mode]">{{ mode }}</span>
+              <span class="text-xs text-slate-400 font-medium">{{ absoluteTime(viewTeam.created_at) }}</span>
             </div>
           </div>
-          <div class="flex items-center gap-3 shrink-0">
-            <!-- 视频按钮 - 更明显 -->
+          <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+            <!-- 举报按钮 -->
+            <button @click="openReport(viewTeam)" class="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-400 hover:text-orange-500 hover:border-orange-200 text-xs font-semibold transition-all">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"></path></svg>
+              举报/反馈
+            </button>
+            <!-- 视频按钮 -->
             <a v-if="viewTeam.video" :href="viewTeam.video" target="_blank" class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-md hover:shadow-lg active:scale-95 transition-all">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
               参考视频
@@ -347,7 +371,7 @@
         <!-- 提示横幅 -->
         <div class="mb-5 bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-xl text-sm font-medium flex items-start gap-2">
           <svg class="w-5 h-5 shrink-0 mt-0.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"></path></svg>
-          <span>目前修改只支持<strong>同设备浏览器</strong>进行，建议确认无误后再发布。如需后续修改，可 B站私信管理员协助处理。</span>
+          <span>目前修改只支持<strong>同设备同浏览器</strong>进行，建议确认无误后再发布。如需后续修改，可B站私信管理员协助处理。</span>
         </div>
 
         <!-- 管理员模式提示 -->
@@ -556,6 +580,140 @@
       </div>
     </div>
 
+    <!-- 举报/反馈弹窗 -->
+    <div v-if="reportModal.show" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" @click="reportModal.show = false"></div>
+      <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 animate-pop relative z-10">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="text-lg font-bold text-slate-800">举报 / 反馈</h3>
+            <p class="text-xs text-slate-400 font-medium mt-0.5 truncate max-w-[200px]">{{ reportModal.teamName }}</p>
+          </div>
+          <button @click="reportModal.show = false" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 transition-colors">✕</button>
+        </div>
+        <div class="space-y-2 mb-4">
+          <button v-for="r in REPORT_REASONS" :key="r" @click="reportModal.reason = r"
+            class="w-full text-left px-4 py-2.5 rounded-xl border text-sm font-semibold transition-all"
+            :class="reportModal.reason === r ? 'bg-orange-50 border-orange-300 text-orange-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'">
+            {{ r }}
+          </button>
+        </div>
+        <textarea v-if="reportModal.reason === '其他'" v-model="reportModal.detail" rows="2"
+          class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-orange-300 resize-none mb-4 font-medium"
+          placeholder="请描述具体问题..."></textarea>
+        <div class="flex gap-3">
+          <button @click="reportModal.show = false" class="flex-1 px-4 py-3 rounded-xl bg-slate-100 text-slate-500 font-bold text-sm hover:bg-slate-200 transition-colors">取消</button>
+          <button @click="submitReport" :disabled="!reportModal.reason || reportModal.submitting"
+            class="flex-1 px-4 py-3 rounded-xl bg-orange-500 text-white font-bold text-sm hover:bg-orange-600 transition-colors disabled:opacity-50 shadow-md shadow-orange-100">
+            {{ reportModal.submitting ? '提交中...' : '提交举报' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast通知容器 -->
+    <div class="fixed top-4 right-4 z-[200] flex flex-col gap-2 pointer-events-none">
+      <div v-for="toast in toasts" :key="toast.id"
+        class="flex items-center gap-3 px-4 py-3 rounded-2xl shadow-lg text-sm font-semibold pointer-events-auto toast-enter max-w-xs"
+        :class="toast.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'">
+        <svg v-if="toast.type === 'success'" class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
+        <svg v-else class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+        {{ toast.message }}
+      </div>
+    </div>
+
+    <!-- ======================== 管理员面板视图 ======================== -->
+    <div v-if="viewMode === 'admin'" class="animate-pop">
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <!-- Tab栏 -->
+        <div class="flex border-b border-slate-100">
+          <button v-for="tab in ['举报列表','队伍动态','点赞排行']" :key="tab" @click="adminTab = tab"
+            class="flex-1 py-3.5 text-sm font-bold transition-colors"
+            :class="adminTab === tab ? 'text-violet-600 border-b-2 border-violet-500 bg-violet-50/50' : 'text-slate-400 hover:text-slate-600'">
+            {{ tab }}
+            <span v-if="tab === '举报列表' && pendingReportCount > 0" class="ml-1.5 bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">{{ pendingReportCount }}</span>
+          </button>
+        </div>
+
+        <!-- 举报列表 -->
+        <div v-if="adminTab === '举报列表'" class="p-5">
+          <div v-if="adminLoading" class="text-center py-12 text-slate-400 text-sm font-medium">加载中...</div>
+          <div v-else-if="reports.length === 0" class="text-center py-12 text-slate-400 text-sm font-medium">暂无举报记录</div>
+          <div v-else class="space-y-3">
+            <div v-for="r in reports" :key="r.id" class="border rounded-xl p-4 transition-colors"
+              :class="r.status === 'pending' ? 'border-orange-200 bg-orange-50/40' : 'border-slate-100 bg-slate-50/50 opacity-60'">
+              <div class="flex items-start justify-between gap-3">
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 mb-1 flex-wrap">
+                    <span class="text-xs font-black px-2 py-0.5 rounded-full"
+                      :class="r.status === 'pending' ? 'bg-orange-100 text-orange-600' : 'bg-slate-200 text-slate-500'">
+                      {{ r.status === 'pending' ? '待处理' : '已处理' }}
+                    </span>
+                    <span class="text-xs font-bold text-slate-700 truncate">{{ r.team_name }}</span>
+                  </div>
+                  <p class="text-sm font-semibold text-slate-800 mb-1">{{ r.reason }}</p>
+                  <p v-if="r.detail" class="text-xs text-slate-500 font-medium mb-1">{{ r.detail }}</p>
+                  <p class="text-[11px] text-slate-400 font-medium">{{ absoluteTime(r.created_at) }}</p>
+                </div>
+                <div class="flex flex-col gap-2 shrink-0">
+                  <button @click="openView(teams.find(t => t.id === r.team_id) || {id: r.team_id, name: r.team_name})" class="text-xs text-blue-500 font-semibold hover:underline whitespace-nowrap">查看队伍</button>
+                  <button v-if="r.status === 'pending'" @click="resolveReport(r.id)" class="text-xs text-emerald-600 font-semibold hover:underline whitespace-nowrap">标为已处理</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 队伍动态 -->
+        <div v-if="adminTab === '队伍动态'" class="p-5">
+          <div v-if="adminLoading" class="text-center py-12 text-slate-400 text-sm font-medium">加载中...</div>
+          <div v-else-if="teams.length === 0" class="text-center py-12 text-slate-400 text-sm font-medium">暂无数据</div>
+          <div v-else class="space-y-2">
+            <div v-for="t in [...teams].sort((a,b) => new Date(b.created_at)-new Date(a.created_at)).slice(0,50)" :key="t.id"
+              class="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer border border-transparent hover:border-slate-100"
+              @click="openView(t)">
+              <div class="flex gap-1 shrink-0">
+                <div v-for="(char, i) in t.chars" :key="i" class="w-7 h-7 rounded-full overflow-hidden border-2 border-white shadow-sm" :class="CHAR_BG_COLORS[i]">
+                  <img v-if="getAvatar(char)" :src="getAvatar(char)" class="w-full h-full object-cover" @error="handleImgError">
+                </div>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-bold text-slate-800 truncate">{{ t.name }}</p>
+                <p class="text-[11px] text-slate-400 font-medium">{{ t.author_name }} · {{ absoluteTime(t.created_at) }}</p>
+              </div>
+              <div class="flex items-center gap-1 text-slate-400 shrink-0">
+                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
+                <span class="text-xs font-bold">{{ t.likes || 0 }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 点赞排行 -->
+        <div v-if="adminTab === '点赞排行'" class="p-5">
+          <div v-if="teams.length === 0" class="text-center py-12 text-slate-400 text-sm font-medium">暂无数据</div>
+          <div v-else class="space-y-2">
+            <div v-for="(t, idx) in [...teams].sort((a,b) => (b.likes||0)-(a.likes||0)).slice(0,20)" :key="t.id"
+              class="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer border border-transparent hover:border-slate-100"
+              @click="openView(t)">
+              <div class="w-8 h-8 rounded-xl flex items-center justify-center text-sm font-black shrink-0"
+                :class="idx === 0 ? 'bg-amber-100 text-amber-600' : idx === 1 ? 'bg-slate-100 text-slate-500' : idx === 2 ? 'bg-orange-50 text-orange-500' : 'bg-slate-50 text-slate-400'">
+                {{ idx + 1 }}
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-bold text-slate-800 truncate">{{ t.name }}</p>
+                <p class="text-[11px] text-slate-400 font-medium">{{ t.author_name }}</p>
+              </div>
+              <div class="flex items-center gap-1.5 text-rose-500 shrink-0">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
+                <span class="text-sm font-black">{{ t.likes || 0 }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 管理员登录弹窗 -->
     <div v-if="adminModal.show" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" @click="adminModal.show = false"></div>
@@ -591,7 +749,12 @@
     </div>
 
     <!-- 右下角管理员入口 -->
-    <div class="fixed bottom-4 right-4 z-30">
+    <div class="fixed bottom-4 right-4 z-30 flex flex-col gap-2 items-end">
+      <button v-if="isAdmin && viewMode !== 'admin'" @click="openAdminPanel" class="flex items-center gap-1.5 bg-violet-100 border border-violet-200 text-violet-700 px-3 py-2 rounded-xl text-xs font-bold shadow-sm transition-all hover:bg-violet-200">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+        管理面板
+        <span v-if="pendingReportCount > 0" class="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none">{{ pendingReportCount }}</span>
+      </button>
       <button v-if="!isAdmin" @click="openAdminModal" class="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-300 px-3 py-2 rounded-xl text-xs font-semibold shadow-sm transition-all">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
         管理员
@@ -650,7 +813,7 @@
       return id;
     }
 
-    const { createApp, ref, computed, onMounted, nextTick } = Vue;
+    const { createApp, ref, computed, onMounted, nextTick, watch } = Vue;
 
     const app = createApp({
       setup() {
@@ -680,6 +843,31 @@
         const adminModal = ref({ show: false, password: '', error: '', loading: false });
         const adminInputRef = ref(null);
 
+        // Toast
+        const toasts = ref([]);
+        const showToast = (message, type = 'success') => {
+          const id = Date.now();
+          toasts.value.push({ id, message, type });
+          setTimeout(() => { toasts.value = toasts.value.filter(t => t.id !== id); }, 3000);
+        };
+
+        // 分页
+        const PAGE_SIZE = 12;
+        const currentPage = ref(1);
+        const isLoadingMore = ref(false);
+        const noMoreData = ref(false);
+        const scrollSentinel = ref(null);
+
+        // 举报
+        const REPORT_REASONS = ['内容错误', '视频失效', '重复内容', '低质量/恶意投稿', '其他'];
+        const reportModal = ref({ show: false, teamId: null, teamName: '', reason: '', detail: '', submitting: false });
+
+        // 管理面板
+        const adminTab = ref('举报列表');
+        const reports = ref([]);
+        const adminLoading = ref(false);
+        const pendingReportCount = ref(0);
+
         const DIFFICULTY_COLORS = {
           '轮切轴': 'peer-checked:bg-emerald-500 peer-checked:border-emerald-500',
           '轮椅轴': 'peer-checked:bg-lime-500 peer-checked:border-lime-500',
@@ -689,10 +877,10 @@
 
         // 难度标签颜色（用于卡片/查看页展示）
         const DIFFICULTY_TAG_COLORS = {
-          '轮切轴': 'bg-emerald-50 text-emerald-600 border-emerald-200',
-          '轮椅轴': 'bg-lime-50 text-lime-600 border-lime-200',
-          '进阶轴': 'bg-orange-50 text-orange-600 border-orange-200',
-          '高难轴': 'bg-rose-50 text-rose-600 border-rose-200'
+          '轮切轴': 'bg-emerald-50 text-emerald-600 border-emerald-300',
+          '轮椅轴': 'bg-lime-50 text-lime-600 border-lime-300',
+          '进阶轴': 'bg-orange-50 text-orange-600 border-orange-300',
+          '高难轴': 'bg-rose-50 text-rose-600 border-rose-300'
         };
 
         const MODE_COLORS = {
@@ -753,8 +941,6 @@
 
         const filteredAndSortedTeams = computed(() => {
           let result = [...teams.value];
-
-          // 文字搜索
           if (searchQuery.value.trim()) {
             const q = searchQuery.value.trim().toLowerCase();
             result = result.filter(t =>
@@ -764,30 +950,36 @@
               (t.remark && t.remark.toLowerCase().includes(q))
             );
           }
-
-          // 角色筛选（队伍中含有所有选中角色）
           if (filterChars.value.length > 0) {
             result = result.filter(t => filterChars.value.every(fc => t.chars.includes(fc)));
           }
-
-          // 模式筛选（队伍中含有任一选中模式）
           if (filterModes.value.length > 0) {
             result = result.filter(t => filterModes.value.some(fm => t.modes && t.modes.includes(fm)));
           }
-
-          // 难度筛选
           if (filterDiffs.value.length > 0) {
             result = result.filter(t => filterDiffs.value.includes(t.difficulty));
           }
-
-          // 排序
           if (sortOrder.value === 'likes') {
             result.sort((a, b) => (b.likes || 0) - (a.likes || 0));
           } else {
             result.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
           }
+          return result.slice(0, currentPage.value * PAGE_SIZE);
+        });
 
-          return result;
+        const totalFiltered = computed(() => {
+          let result = [...teams.value];
+          if (searchQuery.value.trim()) {
+            const q = searchQuery.value.trim().toLowerCase();
+            result = result.filter(t =>
+              t.name.toLowerCase().includes(q) || t.author_name.toLowerCase().includes(q) ||
+              t.chars.some(c => c.toLowerCase().includes(q)) || (t.remark && t.remark.toLowerCase().includes(q))
+            );
+          }
+          if (filterChars.value.length > 0) result = result.filter(t => filterChars.value.every(fc => t.chars.includes(fc)));
+          if (filterModes.value.length > 0) result = result.filter(t => filterModes.value.some(fm => t.modes && t.modes.includes(fm)));
+          if (filterDiffs.value.length > 0) result = result.filter(t => filterDiffs.value.includes(t.difficulty));
+          return result.length;
         });
 
         const filteredCharOptions = computed(() => {
@@ -811,15 +1003,28 @@
 
         const fetchTeams = async () => {
           isLoading.value = true;
+          currentPage.value = 1;
+          noMoreData.value = false;
           const { data, error } = await supabaseClient
-            .from('teams')
-            .select('*')
+            .from('teams').select('*')
             .order('likes', { ascending: false })
             .order('created_at', { ascending: false });
           if (!error && data) teams.value = data;
           const { data: likesData } = await supabaseClient.from('user_likes').select('team_id').eq('device_id', deviceId);
           if (likesData) userLikes.value = new Set(likesData.map(l => l.team_id));
           isLoading.value = false;
+        };
+
+        const loadMore = () => {
+          if (isLoadingMore.value || noMoreData.value) return;
+          const shown = currentPage.value * PAGE_SIZE;
+          if (shown >= totalFiltered.value) { noMoreData.value = true; return; }
+          isLoadingMore.value = true;
+          setTimeout(() => {
+            currentPage.value++;
+            isLoadingMore.value = false;
+            if (currentPage.value * PAGE_SIZE >= totalFiltered.value) noMoreData.value = true;
+          }, 300);
         };
 
         onMounted(() => {
@@ -829,7 +1034,18 @@
             closeCharSelect();
             activeStepSegId.value = null;
           });
+          // 无限滚动 IntersectionObserver
+          const observer = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting && viewMode.value === 'grid') loadMore();
+          }, { threshold: 0.1 });
+          watch(scrollSentinel, (el) => { if (el) observer.observe(el); });
         });
+
+        // 筛选/排序变化时重置分页
+        watch([searchQuery, filterChars, filterModes, filterDiffs, sortOrder], () => {
+          currentPage.value = 1;
+          noMoreData.value = false;
+        }, { deep: true });
 
         const createNewTeam = () => {
           detailTeam.value = {
@@ -883,9 +1099,9 @@
         const publishTeam = async () => {
           if (!isAuthor.value) return;
           const t = detailTeam.value;
-          if (!t.name.trim()) return alert('请输入配队名称');
-          if (!t.difficulty) return alert('请选择排轴难度');
-          if (!t.video.trim()) return alert('请提供参考视频链接');
+          if (!t.name.trim()) return showToast('请输入配队名称', 'error');
+          if (!t.difficulty) return showToast('请选择排轴难度', 'error');
+          if (!t.video.trim()) return showToast('请提供参考视频链接', 'error');
           if (!isAdmin.value) localStorage.setItem('mc_author_name', t.author_name);
           isSaving.value = true;
           const payload = {
@@ -895,34 +1111,100 @@
             modes: t.modes, startup: t.startup, loop: t.loop
           };
           if (t.id) payload.id = t.id;
-
           let error;
           if (isAdmin.value && t.id) {
-            // 管理员编辑已有队伍：走 admin_upsert_team RPC 绕过 RLS
-            ({ error } = await supabaseClient.rpc('admin_upsert_team', {
-              p_team: JSON.stringify(payload)
-            }));
+            ({ error } = await supabaseClient.rpc('admin_upsert_team', { p_team: JSON.stringify(payload) }));
           } else {
-            // 普通作者新建或编辑自己的队伍
             ({ error } = await supabaseClient.from('teams').upsert(payload));
           }
-
           isSaving.value = false;
-          if (error) alert('发布失败: ' + error.message);
-          else { alert('发布成功！'); fetchTeams(); backToGrid(); }
+          if (error) showToast('发布失败: ' + error.message, 'error');
+          else { showToast('发布成功！'); fetchTeams(); backToGrid(); }
         };
 
         const deleteTeam = async (id) => {
           if (!confirm('确定要删除这个配队吗？操作不可逆。')) return;
           let error;
           if (isAdmin.value) {
-            // 管理员通过 RPC 删除，绕过 author_id 限制
             ({ error } = await supabaseClient.rpc('admin_delete_team', { p_team_id: id }));
           } else {
             ({ error } = await supabaseClient.from('teams').delete().eq('id', id).eq('author_id', deviceId));
           }
-          if (!error) teams.value = teams.value.filter(t => t.id !== id);
-          else alert('删除失败: ' + error.message);
+          if (!error) { teams.value = teams.value.filter(t => t.id !== id); showToast('删除成功'); }
+          else showToast('删除失败: ' + error.message, 'error');
+        };
+
+        // 时间格式化
+        const relativeTime = (dateStr) => {
+          if (!dateStr) return '';
+          const diff = Date.now() - new Date(dateStr).getTime();
+          const m = Math.floor(diff / 60000);
+          if (m < 1) return '刚刚';
+          if (m < 60) return `${m}分钟前`;
+          const h = Math.floor(m / 60);
+          if (h < 24) return `${h}小时前`;
+          const d = Math.floor(h / 24);
+          if (d < 30) return `${d}天前`;
+          const mo = Math.floor(d / 30);
+          if (mo < 12) return `${mo}个月前`;
+          return `${Math.floor(mo / 12)}年前`;
+        };
+
+        const absoluteTime = (dateStr) => {
+          if (!dateStr) return '';
+          const d = new Date(dateStr);
+          return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        };
+
+        // 举报
+        const openReport = (team) => {
+          reportModal.value = { show: true, teamId: team.id, teamName: team.name, reason: '', detail: '', submitting: false };
+        };
+
+        const submitReport = async () => {
+          if (!reportModal.value.reason) return;
+          reportModal.value.submitting = true;
+          const { error } = await supabaseClient.rpc('submit_report', {
+            p_team_id: reportModal.value.teamId,
+            p_team_name: reportModal.value.teamName,
+            p_reason: reportModal.value.reason,
+            p_detail: reportModal.value.reason === '其他' ? reportModal.value.detail : '',
+            p_device_id: deviceId
+          });
+          reportModal.value.submitting = false;
+          reportModal.value.show = false;
+          if (error) showToast('提交失败，请稍后重试', 'error');
+          else showToast('反馈已提交，感谢你的反馈！');
+        };
+
+        // 管理面板
+        const openAdminPanel = async () => {
+          viewMode.value = 'admin';
+          adminTab.value = '举报列表';
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          await fetchReports();
+        };
+
+        const fetchReports = async () => {
+          adminLoading.value = true;
+          const { data, error } = await supabaseClient
+            .from('reports').select('*')
+            .order('created_at', { ascending: false });
+          if (!error && data) {
+            reports.value = data;
+            pendingReportCount.value = data.filter(r => r.status === 'pending').length;
+          }
+          adminLoading.value = false;
+        };
+
+        const resolveReport = async (id) => {
+          const { error } = await supabaseClient.from('reports').update({ status: 'resolved' }).eq('id', id);
+          if (!error) {
+            const r = reports.value.find(r => r.id === id);
+            if (r) r.status = 'resolved';
+            pendingReportCount.value = reports.value.filter(r => r.status === 'pending').length;
+            showToast('已标记为处理完成');
+          } else showToast('操作失败', 'error');
         };
 
         const hasLiked = (teamId) => userLikes.value.has(teamId);
@@ -1015,7 +1297,10 @@
             isAdmin.value = true;
             sessionStorage.setItem('mc_is_admin', '1');
             adminModal.value.show = false;
-            alert('管理员登录成功！');
+            showToast('管理员登录成功！');
+            // 加载待处理举报数
+            const { data: rData } = await supabaseClient.from('reports').select('id').eq('status', 'pending');
+            if (rData) pendingReportCount.value = rData.length;
           } else {
             adminModal.value.error = '密码错误，请重试';
           }
@@ -1024,7 +1309,9 @@
         const logoutAdmin = () => {
           if (!confirm('确认退出管理员模式？')) return;
           isAdmin.value = false;
+          pendingReportCount.value = 0;
           sessionStorage.removeItem('mc_is_admin');
+          if (viewMode.value === 'admin') backToGrid();
         };
 
         return {
@@ -1032,8 +1319,9 @@
           searchQuery, sortOrder, filterPanelOpen, filterChars, filterModes, filterDiffs,
           hasActiveFilters, activeFilterCount, allCharOptions,
           activeMenu, activeCharSelectIdx, charSearchQuery, filteredCharOptions,
-          activeStepSegId, isLoading, isSaving, isAuthor, isAdmin,
-          adminModal, adminInputRef, customModal, customInputRef,
+          activeStepSegId, isLoading, isSaving, isLoadingMore, noMoreData, scrollSentinel,
+          isAuthor, isAdmin, adminModal, adminInputRef, customModal, customInputRef,
+          toasts, reportModal, REPORT_REASONS, adminTab, reports, adminLoading, pendingReportCount,
           DIFFICULTY_OPTIONS, MODE_OPTIONS, CHAR_BG_COLORS, CHAR_TEXT_COLORS, SKILLS,
           DIFFICULTY_COLORS, DIFFICULTY_TAG_COLORS, MODE_COLORS, MODE_TAG_COLORS,
           fetchTeams, createNewTeam, openView, openDetail, switchToEdit, backToGrid,
@@ -1043,7 +1331,8 @@
           confirmCustom, cancelCustom,
           toggleFilterChar, toggleFilterMode, toggleFilterDiff, resetAllFilters,
           getFilterModeActiveClass, getFilterDiffActiveClass,
-          openAdminModal, verifyAdmin, logoutAdmin
+          openAdminModal, verifyAdmin, logoutAdmin, openAdminPanel, fetchReports, resolveReport,
+          openReport, submitReport, relativeTime, absoluteTime
         };
       }
     });
