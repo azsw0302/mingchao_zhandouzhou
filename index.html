@@ -284,6 +284,12 @@
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"></path></svg>
               举报/反馈
             </button>
+            <!-- 下载轴图按钮 -->
+            <button @click="downloadAxisImage(viewTeam)" :disabled="isGeneratingImage"
+              class="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-500 hover:text-emerald-600 hover:border-emerald-300 text-xs font-semibold transition-all disabled:opacity-50">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+              {{ isGeneratingImage ? '生成中...' : '下载轴图' }}
+            </button>
             <!-- 视频按钮 -->
             <a v-if="viewTeam.video" :href="viewTeam.video" target="_blank" class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-md hover:shadow-lg active:scale-95 transition-all">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -371,7 +377,7 @@
         <!-- 提示横幅 -->
         <div class="mb-5 bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-xl text-sm font-medium flex items-start gap-2">
           <svg class="w-5 h-5 shrink-0 mt-0.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"></path></svg>
-          <span>目前修改只支持<strong>同设备同浏览器</strong>进行，建议确认无误后再发布。如需后续修改，可B站私信管理员协助处理。</span>
+          <span>目前修改只支持<strong>同设备浏览器</strong>进行，建议确认无误后再发布。如需后续修改，可 B站私信管理员协助处理。</span>
         </div>
 
         <!-- 管理员模式提示 -->
@@ -867,6 +873,7 @@
         const reports = ref([]);
         const adminLoading = ref(false);
         const pendingReportCount = ref(0);
+        const isGeneratingImage = ref(false);
 
         const DIFFICULTY_COLORS = {
           '轮切轴': 'peer-checked:bg-emerald-500 peer-checked:border-emerald-500',
@@ -1207,6 +1214,331 @@
           } else showToast('操作失败', 'error');
         };
 
+        // Canvas 轴图生成
+        const CHAR_COLORS_HEX = ['#3b82f6', '#f97316', '#10b981'];
+        const CHAR_COLORS_LIGHT = ['#eff6ff', '#fff7ed', '#f0fdf4'];
+
+        const loadImage = (src) => new Promise((resolve) => {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = () => resolve(img);
+          img.onerror = () => resolve(null);
+          img.src = src;
+        });
+
+        const downloadAxisImage = async (team) => {
+          if (isGeneratingImage.value) return;
+          isGeneratingImage.value = true;
+
+          try {
+            // 预加载所有角色头像
+            const avatarImgs = await Promise.all(
+              team.chars.map(c => getAvatar(c) ? loadImage(getAvatar(c)) : Promise.resolve(null))
+            );
+
+            // 画布参数
+            const DPR = 2; // 高清
+            const PAD = 32;
+            const BLOCK_H = 44;
+            const BLOCK_GAP = 6;
+            const AVATAR_R = 14;
+            const FONT = '700 13px "Noto Sans SC", system-ui, sans-serif';
+            const FONT_SM = '600 11px "Noto Sans SC", system-ui, sans-serif';
+            const FONT_TITLE = '700 18px "Noto Sans SC", system-ui, sans-serif';
+            const FONT_SECTION = '700 13px "Noto Sans SC", system-ui, sans-serif';
+
+            const axes = [
+              { key: 'startup', label: '启动轴' },
+              { key: 'loop',    label: '循环轴' }
+            ];
+
+            // 先用离屏 canvas 测量每个轴需要多少行
+            const measureCanvas = document.createElement('canvas');
+            const mCtx = measureCanvas.getContext('2d');
+
+            const CONTENT_W = 900;
+            const measureAxisRows = (axisData) => {
+              if (!axisData.length) return 1;
+              mCtx.font = FONT;
+              let x = 0; let rows = 1;
+              for (let i = 0; i < axisData.length; i++) {
+                const el = axisData[i];
+                const prev = axisData[i - 1];
+                const isFirst = i === 0;
+                const charSwitch = !isFirst && el.charIdx !== prev.charIdx;
+
+                // 切人箭头宽度
+                if (charSwitch) x += 36;
+                else if (!isFirst) x += BLOCK_GAP;
+
+                // 计算块宽
+                let blockW = 0;
+                const showHeader = isFirst || charSwitch;
+                if (showHeader) {
+                  mCtx.font = FONT_SM;
+                  const nameW = mCtx.measureText(team.chars[el.charIdx] || '').width;
+                  blockW += AVATAR_R * 2 + 6 + nameW + 12;
+                  mCtx.font = FONT;
+                }
+                const skillLabel = el.skillKey === 'Custom' ? el.customText : SKILLS[el.skillKey]?.axisLabel || el.skillKey;
+                const skillText = skillLabel + (el.seg > 0 ? el.seg : '') + (el.count > 1 ? `×${el.count}` : '');
+                blockW += mCtx.measureText(skillText).width + 24;
+
+                if (x + blockW > CONTENT_W && !isFirst) { rows++; x = blockW + BLOCK_GAP; }
+                else { x += blockW; }
+              }
+              return rows;
+            };
+
+            const rowCounts = axes.map(a => measureAxisRows(team[a.key]));
+            const sectionHeights = rowCounts.map(r => 42 + r * (BLOCK_H + BLOCK_GAP) + 20);
+            const HEADER_H = 80;
+            const totalH = HEADER_H + sectionHeights.reduce((a, b) => a + b, 0) + PAD * 2 + 16;
+            const totalW = CONTENT_W + PAD * 2;
+
+            const canvas = document.createElement('canvas');
+            canvas.width = totalW * DPR;
+            canvas.height = totalH * DPR;
+            const ctx = canvas.getContext('2d');
+            ctx.scale(DPR, DPR);
+
+            // 背景
+            ctx.fillStyle = '#f8fafc';
+            ctx.fillRect(0, 0, totalW, totalH);
+
+            // 白色内容卡片
+            const cardRadius = 16;
+            ctx.fillStyle = '#ffffff';
+            ctx.shadowColor = 'rgba(0,0,0,0.08)';
+            ctx.shadowBlur = 20;
+            ctx.beginPath();
+            ctx.roundRect(PAD / 2, PAD / 2, totalW - PAD, totalH - PAD, cardRadius);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // 标题区
+            let y = PAD + 8;
+            ctx.fillStyle = '#0f172a';
+            ctx.font = FONT_TITLE;
+            ctx.fillText(team.name, PAD + 8, y + 22);
+
+            // 难度 + 作者 + 角色
+            const diffColors = { 轮切轴: '#22c55e', 轮椅轴: '#84cc16', 进阶轴: '#f97316', 高难轴: '#f43f5e' };
+            const diffColor = diffColors[team.difficulty] || '#94a3b8';
+            ctx.font = FONT_SM;
+            ctx.fillStyle = diffColor;
+            const diffW = ctx.measureText(team.difficulty).width + 16;
+            ctx.strokeStyle = diffColor;
+            ctx.lineWidth = 1.5;
+            roundRect(ctx, PAD + 8, y + 30, diffW, 20, 6);
+            ctx.stroke();
+            ctx.fillText(team.difficulty, PAD + 16, y + 44);
+
+            ctx.fillStyle = '#64748b';
+            ctx.fillText(team.author_name, PAD + 8 + diffW + 12, y + 44);
+
+            // 角色头像行
+            let ax = PAD + 8 + diffW + 12 + ctx.measureText(team.author_name).width + 20;
+            for (let i = 0; i < team.chars.length; i++) {
+              ctx.beginPath();
+              ctx.arc(ax + AVATAR_R, y + 36, AVATAR_R, 0, Math.PI * 2);
+              ctx.fillStyle = CHAR_COLORS_HEX[i];
+              ctx.fill();
+              if (avatarImgs[i]) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(ax + AVATAR_R, y + 36, AVATAR_R, 0, Math.PI * 2);
+                ctx.clip();
+                ctx.drawImage(avatarImgs[i], ax, y + 36 - AVATAR_R, AVATAR_R * 2, AVATAR_R * 2);
+                ctx.restore();
+              }
+              ctx.font = FONT_SM;
+              ctx.fillStyle = CHAR_COLORS_HEX[i];
+              const charNameW = ctx.measureText(team.chars[i]).width;
+              ctx.fillText(team.chars[i], ax + AVATAR_R * 2 + 5, y + 40);
+              ax += AVATAR_R * 2 + 5 + charNameW + 14;
+            }
+
+            y += HEADER_H;
+
+            // 绘制每个轴
+            for (let si = 0; si < axes.length; si++) {
+              const { key, label } = axes[si];
+              const axisData = team[key];
+              const secH = sectionHeights[si];
+
+              // 轴背景
+              ctx.fillStyle = '#f8fafc';
+              ctx.beginPath();
+              ctx.roundRect(PAD, y, totalW - PAD * 2, secH, 12);
+              ctx.fill();
+
+              // 轴标题
+              ctx.font = FONT_SECTION;
+              ctx.fillStyle = '#334155';
+              ctx.fillText(label, PAD + 14, y + 22);
+              ctx.fillStyle = '#94a3b8';
+              ctx.font = FONT_SM;
+              ctx.fillText(`${axisData.length} 步`, PAD + 14 + ctx.measureText(label).width + 10, y + 22);
+
+              // 分隔线
+              ctx.strokeStyle = '#e2e8f0';
+              ctx.lineWidth = 1;
+              ctx.beginPath();
+              ctx.moveTo(PAD + 14 + 60 + 30, y + 16);
+              ctx.lineTo(totalW - PAD - 14, y + 16);
+              ctx.stroke();
+
+              // 绘制技能块
+              const blockY0 = y + 42;
+              let bx = PAD + 14;
+              let by = blockY0;
+
+              for (let i = 0; i < axisData.length; i++) {
+                const el = axisData[i];
+                const prev = axisData[i - 1];
+                const isFirst = i === 0;
+                const charSwitch = !isFirst && el.charIdx !== prev.charIdx;
+                const showHeader = isFirst || charSwitch;
+                const color = CHAR_COLORS_HEX[el.charIdx] || '#64748b';
+                const colorLight = CHAR_COLORS_LIGHT[el.charIdx] || '#f8fafc';
+
+                // 计算本块宽度
+                let blockTextParts = [];
+                ctx.font = FONT;
+                const skillLabel2 = el.skillKey === 'Custom' ? el.customText : SKILLS[el.skillKey]?.axisLabel || el.skillKey;
+                const skillText = skillLabel2 + (el.seg > 0 ? String(el.seg) : '');
+                const skillW = ctx.measureText(skillText).width;
+                let headerW = 0;
+                if (showHeader) {
+                  ctx.font = FONT_SM;
+                  headerW = AVATAR_R * 2 + 6 + ctx.measureText(team.chars[el.charIdx] || '').width + 10;
+                  ctx.font = FONT;
+                }
+                const blockW = headerW + skillW + 24;
+
+                // 换行检测
+                if (!isFirst && bx + (charSwitch ? 36 : BLOCK_GAP) + blockW > totalW - PAD - 14) {
+                  bx = PAD + 14;
+                  by += BLOCK_H + BLOCK_GAP;
+                }
+
+                // 切人箭头
+                if (charSwitch) {
+                  const arrowX = bx + 10;
+                  const arrowCY = by + BLOCK_H / 2;
+                  ctx.fillStyle = '#e2e8f0';
+                  ctx.beginPath();
+                  ctx.roundRect(bx, arrowCY - 12, 28, 24, 12);
+                  ctx.fill();
+                  ctx.fillStyle = '#94a3b8';
+                  ctx.font = '700 14px sans-serif';
+                  ctx.fillText('›', bx + 8, arrowCY + 5);
+                  bx += 36;
+                } else if (!isFirst) {
+                  bx += BLOCK_GAP;
+                }
+
+                // 技能块背景
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.roundRect(bx, by, blockW, BLOCK_H, 10);
+                ctx.fill();
+
+                // 头像 + 角色名
+                let textX = bx + 12;
+                if (showHeader) {
+                  // 头像圆
+                  ctx.save();
+                  ctx.beginPath();
+                  ctx.arc(textX + AVATAR_R, by + BLOCK_H / 2, AVATAR_R, 0, Math.PI * 2);
+                  ctx.fillStyle = 'rgba(255,255,255,0.25)';
+                  ctx.fill();
+                  if (avatarImgs[el.charIdx]) {
+                    ctx.beginPath();
+                    ctx.arc(textX + AVATAR_R, by + BLOCK_H / 2, AVATAR_R, 0, Math.PI * 2);
+                    ctx.clip();
+                    ctx.drawImage(avatarImgs[el.charIdx], textX, by + BLOCK_H / 2 - AVATAR_R, AVATAR_R * 2, AVATAR_R * 2);
+                  }
+                  ctx.restore();
+                  textX += AVATAR_R * 2 + 6;
+
+                  // 角色名胶囊
+                  ctx.font = FONT_SM;
+                  const nameW2 = ctx.measureText(team.chars[el.charIdx] || '').width;
+                  ctx.fillStyle = 'rgba(255,255,255,0.22)';
+                  ctx.beginPath();
+                  ctx.roundRect(textX, by + BLOCK_H / 2 - 10, nameW2 + 10, 20, 6);
+                  ctx.fill();
+                  ctx.fillStyle = '#ffffff';
+                  ctx.fillText(team.chars[el.charIdx] || '', textX + 5, by + BLOCK_H / 2 + 4);
+                  textX += nameW2 + 10 + 8;
+                }
+
+                // 技能标签
+                ctx.font = FONT;
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText(skillText, textX, by + BLOCK_H / 2 + 5);
+
+                // 次数徽章
+                if (el.count > 1) {
+                  const badgeText = `×${el.count}`;
+                  ctx.font = '700 10px sans-serif';
+                  const bw = ctx.measureText(badgeText).width + 8;
+                  ctx.fillStyle = '#ef4444';
+                  ctx.beginPath();
+                  ctx.roundRect(bx + blockW - bw / 2, by - 8, bw, 16, 8);
+                  ctx.fill();
+                  ctx.fillStyle = '#fff';
+                  ctx.fillText(badgeText, bx + blockW - bw / 2 + 4, by + 5);
+                }
+
+                bx += blockW;
+              }
+
+              if (axisData.length === 0) {
+                ctx.font = FONT_SM;
+                ctx.fillStyle = '#94a3b8';
+                ctx.fillText('轴为空', PAD + 14, blockY0 + BLOCK_H / 2 + 4);
+              }
+
+              y += secH + 8;
+            }
+
+            // 底部水印
+            ctx.font = '500 11px "Noto Sans SC", system-ui, sans-serif';
+            ctx.fillStyle = '#cbd5e1';
+            ctx.fillText('鸣潮队伍手法轴共享平台', PAD + 8, totalH - PAD / 2 - 2);
+
+            // 下载
+            const link = document.createElement('a');
+            link.download = `${team.name}_轴序.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+            showToast('轴图已生成，开始下载！');
+          } catch (e) {
+            console.error(e);
+            showToast('图片生成失败，请重试', 'error');
+          } finally {
+            isGeneratingImage.value = false;
+          }
+        };
+
+        // 辅助：圆角矩形（兼容不支持 roundRect 的浏览器）
+        function roundRect(ctx, x, y, w, h, r) {
+          ctx.beginPath();
+          ctx.moveTo(x + r, y);
+          ctx.lineTo(x + w - r, y);
+          ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+          ctx.lineTo(x + w, y + h - r);
+          ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+          ctx.lineTo(x + r, y + h);
+          ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+          ctx.lineTo(x, y + r);
+          ctx.quadraticCurveTo(x, y, x + r, y);
+          ctx.closePath();
+        }
+
         const hasLiked = (teamId) => userLikes.value.has(teamId);
 
         const toggleLike = async (team) => {
@@ -1322,6 +1654,7 @@
           activeStepSegId, isLoading, isSaving, isLoadingMore, noMoreData, scrollSentinel,
           isAuthor, isAdmin, adminModal, adminInputRef, customModal, customInputRef,
           toasts, reportModal, REPORT_REASONS, adminTab, reports, adminLoading, pendingReportCount,
+          isGeneratingImage,
           DIFFICULTY_OPTIONS, MODE_OPTIONS, CHAR_BG_COLORS, CHAR_TEXT_COLORS, SKILLS,
           DIFFICULTY_COLORS, DIFFICULTY_TAG_COLORS, MODE_COLORS, MODE_TAG_COLORS,
           fetchTeams, createNewTeam, openView, openDetail, switchToEdit, backToGrid,
@@ -1332,7 +1665,7 @@
           toggleFilterChar, toggleFilterMode, toggleFilterDiff, resetAllFilters,
           getFilterModeActiveClass, getFilterDiffActiveClass,
           openAdminModal, verifyAdmin, logoutAdmin, openAdminPanel, fetchReports, resolveReport,
-          openReport, submitReport, relativeTime, absoluteTime
+          openReport, submitReport, relativeTime, absoluteTime, downloadAxisImage
         };
       }
     });
