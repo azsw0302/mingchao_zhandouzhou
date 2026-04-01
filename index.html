@@ -38,7 +38,7 @@
 <body class="min-h-screen p-4 sm:p-8 selection:bg-blue-100">
   <div id="app" class="max-w-[1100px] mx-auto pb-24">
     
-    <div v-if="activeMenu.teamId" class="fixed inset-0 z-10" @click="closeMenu"></div>
+    <div v-if="activeMenu.axis" class="fixed inset-0 z-10" @click="closeMenu"></div>
 
     <div class="sticky flex flex-wrap gap-3 justify-between items-center mb-8 bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-200 top-2 sm:top-4 z-40">
       <div class="flex items-center gap-3">
@@ -151,8 +151,11 @@
                     <img v-if="getAvatar(char)" :src="getAvatar(char)" class="avatar-img" @error="handleImgError">
                     <span v-else>{{ (char || '?')[0] }}</span>
                   </div>
-                  <input v-model="detailTeam.chars[i]" :disabled="!isAuthor" placeholder="角色名" class="px-3 py-1.5 w-24 sm:w-28 text-sm font-semibold text-center bg-slate-50 border border-slate-200 focus:border-blue-400 rounded-lg outline-none" :class="CHAR_TEXT_COLORS[i]">
+                  <input list="char-options" v-model="detailTeam.chars[i]" :disabled="!isAuthor" placeholder="角色名" class="px-3 py-1.5 w-24 sm:w-28 text-sm font-semibold text-center bg-slate-50 border border-slate-200 focus:border-blue-400 rounded-lg outline-none" :class="CHAR_TEXT_COLORS[i]">
                 </div>
+                <datalist id="char-options">
+                  <option v-for="name in charOptions" :key="name" :value="name"></option>
+                </datalist>
               </div>
             </div>
           </div>
@@ -191,7 +194,7 @@
 
         <div class="mb-5">
           <label class="text-xs font-bold text-slate-500 mb-1 block">打法备注</label>
-          <textarea v-model="detailTeam.remark" :disabled="!isAuthor" rows="2" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:border-blue-400 outline-none resize-y" placeholder="在此输入配队备注…"></textarea>
+          <textarea v-model="detailTeam.remark" :disabled="!isAuthor" rows="2" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:border-blue-400 outline-none resize-y" placeholder="在此输入配队备注…（例如强制要求角色链数、武器、共鸣效率等）"></textarea>
         </div>
 
         <div class="space-y-5">
@@ -242,7 +245,7 @@
 
             <div v-if="isAuthor" class="flex flex-wrap gap-2 sm:gap-3 relative mt-3">
               <div v-for="(char, i) in detailTeam.chars" :key="i" class="relative">
-                <button @click="toggleMenu(detailTeam.id, axis, i)" class="px-3 sm:px-4 py-2 rounded-lg border text-xs sm:text-sm font-semibold transition-all relative z-20 flex items-center gap-1.5 bg-white border-slate-200 text-slate-600 hover:bg-slate-50" :class="{'bg-slate-800 border-slate-800 text-white shadow-md hover:bg-slate-800 hover:text-white': activeMenu.axis === axis && activeMenu.charIdx === i}">
+                <button @click="toggleMenu(axis, i)" class="px-3 sm:px-4 py-2 rounded-lg border text-xs sm:text-sm font-semibold transition-all relative z-20 flex items-center gap-1.5 bg-white border-slate-200 text-slate-600 hover:bg-slate-50" :class="{'bg-slate-800 border-slate-800 text-white shadow-md hover:bg-slate-800 hover:text-white': activeMenu.axis === axis && activeMenu.charIdx === i}">
                   <div class="w-4 h-4 rounded-full overflow-hidden bg-slate-200 flex items-center justify-center" v-if="getAvatar(char)">
                     <img :src="getAvatar(char)" class="w-full h-full object-cover" @error="handleImgError">
                   </div>
@@ -262,12 +265,10 @@
   </div>
 
   <script>
-    // 更改了变量名为 supabaseClient，避开 CDN 内置变量冲突
     const SUPABASE_URL = 'https://gyzousunhdjyjdiyfqdv.supabase.co';
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd5em91c3VuaGRqeWpkaXlmcWR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwMjg3NTIsImV4cCI6MjA5MDYwNDc1Mn0.Bi6tZAB7WWXsmkFjQx1XSbLfE4Z3GRI8hQk2U51W4Ao';
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // 头像字典
     const AVATAR_MAP = {
       '凌阳': 'Lingyang', '折枝': 'Zhezhi', '珂莱塔': 'Carlotta', '安可': 'Encore', '长离': 'Changli',
       '布兰特': 'Brant', '露帕': 'Lupa', '嘉贝莉娜': 'Galbrena', '莫宁': 'Mornye', '爱弥斯': 'Aemeath',
@@ -298,7 +299,6 @@
     const DIFFICULTY_OPTIONS = ['轮切轴', '轮椅轴', '进阶轴', '高难轴'];
     const MODE_OPTIONS = ['深塔', '海墟', '矩阵'];
 
-    // 获取唯一设备ID
     function getDeviceId() {
       let id = localStorage.getItem('mc_device_id');
       if (!id) {
@@ -323,6 +323,8 @@
         
         const isLoading = ref(false);
         const isSaving = ref(false);
+
+        const charOptions = Object.keys(AVATAR_MAP);
 
         const filteredTeams = computed(() => {
           if (!searchQuery.value.trim()) return teams.value;
@@ -493,6 +495,7 @@
             customText = customText.trim();
           }
           detailTeam.value[axis].push({ id: Math.random().toString(), charIdx, skillKey, customText, count: 1 });
+          closeMenu(); // 添加技能后自动关闭菜单，体验更好
         };
 
         const adjustCount = (element, delta) => {
@@ -504,7 +507,7 @@
 
         return {
           deviceId, teams, filteredTeams, viewMode, detailTeam, searchQuery, activeMenu,
-          isLoading, isSaving, isAuthor,
+          isLoading, isSaving, isAuthor, charOptions,
           DIFFICULTY_OPTIONS, MODE_OPTIONS, CHAR_BG_COLORS, CHAR_TEXT_COLORS, SKILLS,
           fetchTeams, createNewTeam, openDetail, backToGrid, publishTeam, deleteTeam,
           hasLiked, toggleLike, getAvatar, handleImgError,
