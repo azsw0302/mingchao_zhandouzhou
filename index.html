@@ -69,11 +69,11 @@
     <!-- 顶部导航栏 -->
     <div class="sticky flex flex-wrap gap-3 justify-between items-center mb-6 bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-200 top-2 sm:top-4 z-40">
       <div class="flex items-center gap-3">
-        <button v-if="viewMode === 'detail' || viewMode === 'view' || viewMode === 'admin'" @click="backToGrid" class="flex items-center gap-1.5 text-slate-500 hover:text-slate-800 transition-colors mr-1">
+        <button v-if="viewMode === 'view' || viewMode === 'admin' || viewMode === 'local' || viewMode === 'localEdit' || viewMode === 'detail'" @click="backToGrid" class="flex items-center gap-1.5 text-slate-500 hover:text-slate-800 transition-colors mr-1">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path></svg>
         </button>
         <div class="w-1.5 h-7 bg-slate-800 rounded-full"></div>
-        <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-slate-800">鸣潮排轴广场</h1>
+        <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-slate-800">鸣潮排轴广场<span class="ml-2 text-xs font-semibold text-slate-400 align-middle">v1.0.0</span></h1>
       </div>
       
       <div class="flex items-center gap-2 sm:gap-3">
@@ -82,23 +82,67 @@
           <button @click="fetchTeams" class="bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-800 px-3 py-2 rounded-lg transition-all text-sm font-semibold shadow-sm">
             {{ isLoading ? '刷新中...' : '刷新大厅' }}
           </button>
-          <button @click="createNewTeam" class="bg-slate-800 text-white px-4 sm:px-5 py-2 rounded-lg hover:bg-slate-700 active:scale-95 transition-all shadow-sm font-semibold text-sm flex items-center gap-2">
+          <button @click="openLocalLibrary" class="bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 px-3 sm:px-4 py-2 rounded-lg transition-all text-sm font-semibold shadow-sm flex items-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path></svg>
+            <span class="hidden sm:inline">我的本地队伍</span><span class="sm:hidden">本地</span>
+            <span v-if="localTeams.length > 0" class="bg-slate-800 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none">{{ localTeams.length }}</span>
+          </button>
+          <button @click="createLocalTeam" class="bg-slate-800 text-white px-4 sm:px-5 py-2 rounded-lg hover:bg-slate-700 active:scale-95 transition-all shadow-sm font-semibold text-sm flex items-center gap-2">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
-            发布新轴
+            新建排轴
           </button>
         </template>
-        <!-- 查看视图按钮 -->
+        <!-- 查看视图按钮 (广场/本地通用) -->
         <template v-if="viewMode === 'view' && viewTeam">
-          <button v-if="viewTeam.author_id === deviceId" @click="switchToEdit" class="bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 px-4 py-2 rounded-lg text-sm font-semibold shadow-sm flex items-center gap-1.5 transition-all">
+          <button v-if="canEditViewTeam" @click="editFromView" class="bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 px-4 py-2 rounded-lg text-sm font-semibold shadow-sm flex items-center gap-1.5 transition-all">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-            编辑我的轴
+            编辑
+          </button>
+          <button v-if="canEditViewTeam" @click="deleteViewTeam" class="bg-white border border-red-200 text-red-500 hover:bg-red-50 px-3 py-2 rounded-lg text-sm font-semibold shadow-sm flex items-center gap-1.5 transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+            删除
           </button>
         </template>
-        <!-- 编辑视图按钮 -->
-        <template v-if="viewMode === 'detail' && detailTeam">
-          <button @click="publishTeam" class="bg-blue-600 text-white hover:bg-blue-700 px-5 py-2 rounded-lg text-sm font-semibold shadow-sm flex items-center gap-1.5 transition-all">
+        <!-- 管理员在线编辑视图按钮 -->
+        <template v-if="viewMode === 'detail' && detailTeam && isAdmin">
+          <button @click="openDeleteConfirm('online', detailTeam.id)" class="bg-white border border-red-200 text-red-500 hover:bg-red-50 px-3 py-2 rounded-lg text-sm font-semibold shadow-sm flex items-center gap-1.5 transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+            删除
+          </button>
+          <button @click="publishTeam" class="bg-violet-600 text-white hover:bg-violet-700 px-5 py-2 rounded-lg text-sm font-semibold shadow-sm flex items-center gap-1.5 transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            {{ isSaving ? '保存中...' : '保存到广场' }}
+          </button>
+        </template>
+        <!-- 本地编辑视图按钮 -->
+        <template v-if="viewMode === 'localEdit' && localEditTeam">
+          <button @click="deleteLocalTeamFromEditor" class="bg-white border border-red-200 text-red-500 hover:bg-red-50 px-3 py-2 rounded-lg text-sm font-semibold shadow-sm flex items-center gap-1.5 transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+            删除
+          </button>
+          <button @click="uploadLocalTeam" class="bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-lg text-sm font-semibold shadow-sm flex items-center gap-1.5 transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+            发布到广场
+          </button>
+          <button @click="saveLocalTeam" class="bg-emerald-600 text-white hover:bg-emerald-700 px-4 py-2 rounded-lg text-sm font-semibold shadow-sm flex items-center gap-1.5 transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            {{ isSaving ? '保存中...' : '保存到本地' }}
+          </button>
+        </template>
+        <!-- 本地库视图按钮 -->
+        <template v-if="viewMode === 'local'">
+          <label class="bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 px-3 py-2 rounded-lg transition-all text-sm font-semibold shadow-sm flex items-center gap-1.5 cursor-pointer">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
-            {{ isSaving ? '发布中...' : '保存并发布' }}
+            导入JSON
+            <input type="file" accept=".json" class="hidden" @change="importLocalTeams">
+          </label>
+          <button @click="exportLocalTeams" class="bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 px-3 py-2 rounded-lg transition-all text-sm font-semibold shadow-sm flex items-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            导出JSON
+          </button>
+          <button @click="createLocalTeam" class="bg-slate-800 text-white px-4 py-2 rounded-lg hover:bg-slate-700 active:scale-95 transition-all shadow-sm font-semibold text-sm flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
+            新建排轴
           </button>
         </template>
       </div>
@@ -208,10 +252,13 @@
           @click="openView(team)">
           <div class="flex justify-between items-start mb-3">
             <h3 class="font-bold text-xl sm:text-2xl text-slate-800 truncate pr-2">{{ team.name }}</h3>
-            <button @click.stop="toggleLike(team)" class="flex items-center gap-1.5 bg-slate-50 hover:bg-rose-50 border border-slate-100 px-2.5 py-1.5 rounded-lg transition-colors shrink-0" :class="{'text-rose-500': hasLiked(team.id), 'text-slate-400': !hasLiked(team.id)}">
-              <svg class="w-4 h-4" :fill="hasLiked(team.id) ? 'currentColor' : 'none'" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
-              <span class="text-xs font-bold">{{ team.likes || 0 }}</span>
-            </button>
+            <div class="flex items-center gap-2 shrink-0">
+              <span class="text-[10px] text-slate-300 font-medium whitespace-nowrap">{{ team.updated_at && team.updated_at !== team.created_at ? '更新于 ' + relativeTime(team.updated_at) : relativeTime(team.created_at) }}</span>
+              <button @click.stop="toggleLike(team)" class="flex items-center gap-1.5 bg-slate-50 hover:bg-rose-50 border border-slate-100 px-2.5 py-1.5 rounded-lg transition-colors" :class="{'text-rose-500': hasLiked(team.id), 'text-slate-400': !hasLiked(team.id)}">
+                <svg class="w-4 h-4" :fill="hasLiked(team.id) ? 'currentColor' : 'none'" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
+                <span class="text-xs font-bold">{{ team.likes || 0 }}</span>
+              </button>
+            </div>
           </div>
 
           <!-- 难度标签突出展示 + 作者 -->
@@ -241,11 +288,12 @@
           <div class="mt-auto border-t border-slate-100 pt-3 flex justify-between items-center">
             <div class="flex flex-col gap-0.5 flex-1 min-w-0">
               <p class="text-xs text-slate-400 line-clamp-1 font-medium">{{ team.remark || '暂无备注…' }}</p>
-              <span class="text-[10px] text-slate-300 font-medium">{{ relativeTime(team.created_at) }}</span>
             </div>
-            <div v-if="team.author_id === deviceId || isAdmin" class="flex gap-2 ml-2 shrink-0">
-              <button @click.stop="openDetail(team)" class="text-xs text-blue-500 font-semibold hover:underline">编辑</button>
-              <button @click.stop="deleteTeam(team.id)" class="text-xs text-red-500 font-semibold hover:underline">删除</button>
+            <div class="flex gap-2 ml-2 shrink-0 items-center">
+              <template v-if="team.author_id === deviceId || isAdmin">
+                <button @click.stop="editFromCard(team)" class="text-xs text-blue-500 font-semibold hover:underline">编辑</button>
+                <button @click.stop="openDeleteConfirm('online', team.id)" class="text-xs text-red-500 font-semibold hover:underline">删除</button>
+              </template>
             </div>
           </div>
         </div>
@@ -268,38 +316,44 @@
       <div class="bg-white rounded-2xl shadow-sm p-5 sm:p-7 border border-slate-200">
         
         <!-- 头部：标题 + 点赞 + 视频 -->
-        <div class="flex flex-col sm:flex-row sm:items-start gap-4 mb-6 pb-5 border-b border-slate-100">
-          <div class="flex-1 min-w-0">
-            <h2 class="text-2xl sm:text-3xl font-black text-slate-800 mb-2 tracking-tight">{{ viewTeam.name }}</h2>
-            <div class="flex flex-wrap items-center gap-2">
-              <span class="text-xs bg-slate-100 text-slate-500 px-2.5 py-1 rounded-lg font-semibold border border-slate-200">作者: {{ viewTeam.author_name }}</span>
-              <span class="text-xs px-2.5 py-1 rounded-lg font-semibold border" :class="DIFFICULTY_TAG_COLORS[viewTeam.difficulty] || 'bg-slate-50 text-slate-500 border-slate-200'">{{ viewTeam.difficulty }}</span>
-              <span v-for="mode in viewTeam.modes" :key="mode" class="text-xs border px-2.5 py-1 rounded-lg font-semibold" :class="MODE_TAG_COLORS[mode]">{{ mode }}</span>
-              <span class="text-xs text-slate-400 font-medium">{{ absoluteTime(viewTeam.created_at) }}</span>
+        <div class="flex flex-col gap-4 mb-6 pb-5 border-b border-slate-100">
+          <div class="flex flex-col sm:flex-row sm:items-start gap-4">
+            <div class="flex-1 min-w-0">
+              <h2 class="text-2xl sm:text-3xl font-black text-slate-800 mb-2 tracking-tight">{{ viewTeam.name }}</h2>
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="text-xs bg-slate-100 text-slate-500 px-2.5 py-1 rounded-lg font-semibold border border-slate-200">作者: {{ viewTeam.author_name }}</span>
+                <span class="text-xs px-2.5 py-1 rounded-lg font-semibold border" :class="DIFFICULTY_TAG_COLORS[viewTeam.difficulty] || 'bg-slate-50 text-slate-500 border-slate-200'">{{ viewTeam.difficulty }}</span>
+                <span v-for="mode in viewTeam.modes" :key="mode" class="text-xs border px-2.5 py-1 rounded-lg font-semibold" :class="MODE_TAG_COLORS[mode]">{{ mode }}</span>
+                <span class="text-xs text-slate-400 font-medium">发布于 {{ absoluteTime(viewTeam.created_at) }}</span>
+              <span v-if="viewTeam.updated_at && viewTeam.updated_at !== viewTeam.created_at" class="text-xs text-slate-400 font-medium">· 更新于 {{ absoluteTime(viewTeam.updated_at) }}</span>
+              </div>
+            </div>
+            <!-- 主操作行：视频 + 点赞 -->
+            <div class="flex items-center gap-2 shrink-0">
+              <a v-if="viewTeam.video" :href="viewTeam.video" target="_blank" class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-md hover:shadow-lg active:scale-95 transition-all">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                参考视频
+              </a>
+              <button @click="toggleLike(viewTeam)" class="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm border-2 transition-all active:scale-95 shadow-sm"
+                :class="hasLiked(viewTeam.id) ? 'bg-rose-500 border-rose-500 text-white shadow-rose-200' : 'bg-white border-slate-200 text-slate-500 hover:border-rose-300 hover:text-rose-500'">
+                <svg class="w-5 h-5" :fill="hasLiked(viewTeam.id) ? 'currentColor' : 'none'" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
+                {{ viewTeam.likes || 0 }}
+              </button>
             </div>
           </div>
-          <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-            <!-- 举报按钮 -->
-            <button @click="openReport(viewTeam)" class="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-400 hover:text-orange-500 hover:border-orange-200 text-xs font-semibold transition-all">
+          <!-- 次操作行：功能性小按钮 -->
+          <div class="flex flex-wrap items-center gap-2">
+            <button v-if="!viewTeam.isLocal && viewTeam.id" @click="openReport(viewTeam)" class="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-400 hover:text-orange-500 hover:border-orange-200 text-xs font-semibold transition-all">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"></path></svg>
               举报/反馈
             </button>
-            <!-- 下载轴图按钮 -->
-            <button @click="downloadAxisImage(viewTeam)" :disabled="isGeneratingImage"
-              class="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-500 hover:text-emerald-600 hover:border-emerald-300 text-xs font-semibold transition-all disabled:opacity-50">
+            <button v-if="!viewTeam.isLocal" @click="copyTeamToLocal(viewTeam)" class="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-400 hover:text-slate-700 hover:border-slate-300 text-xs font-semibold transition-all">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+              复制到本地
+            </button>
+            <button @click="downloadAxisImage(viewTeam)" :disabled="isGeneratingImage" class="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-500 hover:text-emerald-600 hover:border-emerald-300 text-xs font-semibold transition-all disabled:opacity-50">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
               {{ isGeneratingImage ? '生成中...' : '下载轴图' }}
-            </button>
-            <!-- 视频按钮 -->
-            <a v-if="viewTeam.video" :href="viewTeam.video" target="_blank" class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-md hover:shadow-lg active:scale-95 transition-all">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-              参考视频
-            </a>
-            <!-- 点赞按钮 -->
-            <button @click="toggleLike(viewTeam)" class="flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm border-2 transition-all active:scale-95 shadow-sm"
-              :class="hasLiked(viewTeam.id) ? 'bg-rose-500 border-rose-500 text-white shadow-rose-200' : 'bg-white border-slate-200 text-slate-500 hover:border-rose-300 hover:text-rose-500'">
-              <svg class="w-5 h-5" :fill="hasLiked(viewTeam.id) ? 'currentColor' : 'none'" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
-              {{ viewTeam.likes || 0 }}
             </button>
           </div>
         </div>
@@ -329,7 +383,6 @@
           <div v-for="axis in ['startup', 'loop']" :key="axis" class="bg-slate-50/50 rounded-2xl p-4 sm:p-5 border border-slate-100">
             <div class="flex items-center gap-3 mb-4">
               <span class="text-sm font-bold text-slate-700 tracking-wide">{{ axis === 'startup' ? '启动轴' : '循环轴' }}</span>
-              <span class="text-[11px] text-slate-400 font-medium">{{ viewTeam[axis].length }} 步</span>
               <div class="h-px flex-1 bg-slate-200/60"></div>
             </div>
             <div class="mobile-scroll">
@@ -370,31 +423,22 @@
       </div>
     </div>
 
-    <!-- ======================== 编辑视图（作者/管理员） ======================== -->
-    <div v-if="viewMode === 'detail' && detailTeam" class="animate-pop">
+    <!-- ======================== 编辑视图（仅管理员） ======================== -->
+    <div v-if="viewMode === 'detail' && detailTeam && isAdmin" class="animate-pop">
       <div class="bg-white rounded-2xl shadow-sm p-5 sm:p-7 border border-slate-200">
-
-        <!-- 提示横幅 -->
-        <div class="mb-5 bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-xl text-sm font-medium flex items-start gap-2">
-          <svg class="w-5 h-5 shrink-0 mt-0.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"></path></svg>
-          <span>目前修改只支持<strong>同设备浏览器</strong>进行，建议确认无误后再发布。如需后续修改，可B站私信管理员协助处理。</span>
-        </div>
-
-        <!-- 管理员模式提示 -->
-        <div v-if="isAdmin" class="mb-5 bg-violet-50 border border-violet-200 text-violet-800 p-3 rounded-xl text-sm font-medium flex items-center gap-2">
+        <div class="mb-5 bg-violet-50 border border-violet-200 text-violet-800 p-3 rounded-xl text-sm font-medium flex items-center gap-2">
           <svg class="w-5 h-5 shrink-0 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
-          管理员模式已激活，当前可编辑所有队伍数据。
+          管理员模式 — 可直接编辑并保存到广场，修改对所有人立即生效。
         </div>
-
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-5 border-b border-slate-100 pb-5">
           <div class="space-y-4">
             <div>
               <label class="text-xs font-bold text-slate-500 mb-1 block">配队名称</label>
-              <input v-model="detailTeam.name" class="font-bold text-xl text-slate-800 w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 focus:border-blue-400 outline-none" placeholder="输入配队名称">
+              <input v-model="detailTeam.name" class="font-bold text-base text-slate-800 w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 focus:border-blue-400 outline-none" placeholder="输入配队名称">
             </div>
             <div>
-              <label class="text-xs font-bold text-slate-500 mb-1 block">作者名称（不输入则默认漂泊者）</label>
-              <input v-model="detailTeam.author_name" class="text-sm font-semibold text-slate-700 w-full sm:w-1/2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 outline-none" placeholder="你的名字">
+              <label class="text-xs font-bold text-slate-500 mb-1 block">作者昵称 <span class="text-slate-400 font-normal">留空默认为「漂泊者」</span></label>
+              <input v-model="detailTeam.author_name" class="text-sm font-semibold text-slate-700 w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 outline-none" placeholder="作者昵称">
             </div>
             <div>
               <label class="text-xs font-bold text-slate-500 mb-1 block">角色阵容</label>
@@ -405,9 +449,7 @@
                       <img v-if="getAvatar(char)" :src="getAvatar(char)" class="avatar-img" @error="handleImgError">
                       <span v-else>{{ (char || '?')[0] }}</span>
                     </div>
-                    <button @click.stop="openCharSelect(i)" class="px-3 py-1.5 w-24 sm:w-28 text-sm font-semibold text-center bg-slate-50 border border-slate-200 focus:border-blue-400 rounded-lg outline-none cursor-pointer hover:bg-white truncate transition-colors" :class="CHAR_TEXT_COLORS[i]">
-                      {{ char }}
-                    </button>
+                    <button @click.stop="openCharSelect(i)" class="px-3 py-1.5 w-24 sm:w-28 text-sm font-semibold text-center bg-slate-50 border border-slate-200 focus:border-blue-400 rounded-lg outline-none cursor-pointer hover:bg-white truncate transition-colors" :class="CHAR_TEXT_COLORS[i]">{{ char }}</button>
                   </div>
                   <div v-if="activeCharSelectIdx === i" @click.stop class="absolute left-0 top-full mt-2 bg-white border border-slate-200 shadow-xl rounded-xl p-3 z-50 w-[300px] sm:w-[340px] animate-pop">
                     <div class="relative mb-3">
@@ -428,82 +470,64 @@
               </div>
             </div>
           </div>
-
           <div class="space-y-4">
             <div>
               <label class="text-xs font-bold text-slate-500 mb-1 flex items-center gap-1"><span class="text-red-500">*</span> 排轴难度 (必选一项)</label>
               <div class="flex flex-wrap gap-2">
                 <label v-for="diff in DIFFICULTY_OPTIONS" :key="diff" class="cursor-pointer">
                   <input type="radio" v-model="detailTeam.difficulty" :value="diff" class="hidden peer">
-                  <div class="px-3 py-1.5 rounded-lg border text-sm font-semibold transition-colors border-slate-200 text-slate-600 bg-white hover:bg-slate-50 peer-checked:text-white"
-                       :class="DIFFICULTY_COLORS[diff]">
-                    {{ diff }}
-                  </div>
+                  <div class="px-3 py-1.5 rounded-lg border text-sm font-semibold transition-colors border-slate-200 text-slate-600 bg-white hover:bg-slate-50 peer-checked:text-white" :class="DIFFICULTY_COLORS[diff]">{{ diff }}</div>
                 </label>
               </div>
             </div>
-            
             <div>
               <label class="text-xs font-bold text-slate-500 mb-1 flex items-center gap-1">适用场景 (可多选)</label>
               <div class="flex flex-wrap gap-2">
                 <label v-for="mode in MODE_OPTIONS" :key="mode" class="cursor-pointer" @click.stop>
                   <input type="checkbox" v-model="detailTeam.modes" :value="mode" class="hidden peer">
-                  <div class="px-3 py-1.5 rounded-lg border text-sm font-semibold transition-colors border-slate-200 text-slate-600 bg-white hover:bg-slate-50 peer-checked:text-white"
-                       :class="MODE_COLORS[mode]">
-                    {{ mode }}
-                  </div>
+                  <div class="px-3 py-1.5 rounded-lg border text-sm font-semibold transition-colors border-slate-200 text-slate-600 bg-white hover:bg-slate-50 peer-checked:text-white" :class="MODE_COLORS[mode]">{{ mode }}</div>
                 </label>
               </div>
             </div>
-
             <div>
-              <label class="text-xs font-bold text-slate-500 mb-1 flex items-center gap-1"><span class="text-red-500">*</span> 参考视频链接 (必填)</label>
+              <label class="text-xs font-bold text-slate-500 mb-1 flex items-center gap-1">参考视频链接 <span class="text-slate-400 font-normal">(发布时必填)</span></label>
               <input v-model="detailTeam.video" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:border-blue-400 outline-none" placeholder="粘贴B站/YouTube 链接">
             </div>
           </div>
         </div>
-
         <div class="mb-5">
           <label class="text-xs font-bold text-slate-500 mb-1 block">打法备注</label>
           <textarea v-model="detailTeam.remark" rows="2" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:border-blue-400 outline-none resize-y" placeholder="在此输入配队备注…（例如角色链数、武器、共鸣效率等要求）"></textarea>
         </div>
-
         <div class="bg-blue-50 border border-blue-100 p-3 rounded-xl mb-6 text-[12px] text-blue-600 flex flex-wrap gap-x-6 gap-y-2 items-center shadow-sm">
-          <div class="flex items-center gap-1.5 font-bold"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"></path></svg> 操作指南:</div>
+          <div class="flex items-center gap-1.5 font-bold">
+            <svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor"><circle cx="10" cy="10" r="9" fill="#3b82f6"/><circle cx="10" cy="6.5" r="1.2" fill="white"/><rect x="9" y="9" width="2" height="5.5" rx="1" fill="white"/></svg>
+            操作指南:
+          </div>
           <div class="flex items-center gap-1">🖱️ <span class="font-semibold">左键步骤方块:</span> 调整连段(E1/E2)</div>
           <div class="flex items-center gap-1">🖱️ <span class="font-semibold">右键步骤方块:</span> +1使用次数</div>
           <div class="flex items-center gap-1">🖱️ <span class="font-semibold">双击步骤方块:</span> -1使用次数</div>
           <div class="flex items-center gap-1">🖱️ <span class="font-semibold">拖拽步骤方块:</span> 调整位置</div>
         </div>
-
         <div class="space-y-5">
           <div v-for="axis in ['startup', 'loop']" :key="axis" class="bg-slate-50/50 rounded-2xl p-4 sm:p-5 border border-slate-100">
             <div class="flex items-center gap-3 mb-4">
               <span class="text-sm font-bold text-slate-700 tracking-wide">{{ axis === 'startup' ? '启动轴' : '循环轴' }}</span>
-              <span class="text-[11px] text-slate-400 font-medium">{{ detailTeam[axis].length }} 步</span>
               <div class="h-px flex-1 bg-slate-200/60"></div>
             </div>
-
             <div class="mobile-scroll">
               <draggable v-model="detailTeam[axis]" group="shared" item-key="id" :animation="150" class="flex flex-wrap content-start items-center min-h-[56px] w-full pb-2 rounded-xl bg-white border border-slate-200 p-3 sm:p-4 shadow-sm">
                 <template #item="{ element, index }">
                   <div class="relative flex items-center shrink-0 group animate-pop mb-2 mt-1" style="cursor: grab">
-                    <!-- 角色切换箭头 -->
                     <div v-if="index > 0 && element.charIdx !== detailTeam[axis][index-1].charIdx" class="flex items-center mx-2 shrink-0 select-none">
                       <div class="bg-slate-100 border border-slate-200 text-slate-400 rounded-full p-1 shadow-sm"><svg class="w-3 h-3 sm:w-3.5 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path></svg></div>
                     </div>
                     <div v-else-if="index > 0" class="w-1 sm:w-1.5 shrink-0"></div>
-                    
                     <div class="relative">
-                      <!-- 连段气泡 -->
                       <div v-if="activeStepSegId === element.id" @click.stop class="seg-bubble animate-pop">
-                        <button v-for="v in [0,1,2,3,4,5]" :key="v" @click="setSegment(element, v)" class="seg-btn" :class="element.seg === v ? 'active' : ''">
-                          {{ v === 0 ? '无' : v }}
-                        </button>
+                        <button v-for="v in [0,1,2,3,4,5]" :key="v" @click="setSegment(element, v)" class="seg-btn" :class="element.seg === v ? 'active' : ''">{{ v === 0 ? '无' : v }}</button>
                       </div>
-
                       <div v-if="element.count > 1" class="count-badge">×{{ element.count }}</div>
-
                       <div class="flex items-center px-2.5 sm:px-3 py-1.5 rounded-lg shadow-sm border border-black/5 select-none transition-all duration-150"
                            :class="[CHAR_BG_COLORS[element.charIdx], 'hover:-translate-y-0.5 hover:shadow-md']"
                            @click.stop="toggleSegBubble(element.id)"
@@ -526,38 +550,23 @@
                   </div>
                 </template>
                 <template #footer>
-                  <div v-if="detailTeam[axis].length === 0" class="text-slate-400 text-xs sm:text-sm font-medium w-full text-center pointer-events-none py-1">
-                    轴为空，请在下方选择技能
-                  </div>
+                  <div v-if="detailTeam[axis].length === 0" class="text-slate-400 text-xs sm:text-sm font-medium w-full text-center pointer-events-none py-1">轴为空，请在下方选择技能</div>
                 </template>
               </draggable>
             </div>
-
             <div class="flex flex-wrap gap-2 sm:gap-3 relative mt-3">
               <div v-for="(char, i) in detailTeam.chars" :key="i" class="relative">
-                <button 
-                  @click.stop="toggleMenu(axis, i)" 
-                  class="px-3 sm:px-4 py-2 rounded-lg border text-xs sm:text-sm font-semibold transition-all relative z-20 flex items-center gap-1.5 border-slate-200"
-                  :class="[
-                    activeMenu.axis === axis && activeMenu.charIdx === i 
-                      ? 'bg-slate-800 border-slate-800 text-white shadow-md' 
-                      : 'bg-white text-slate-600 hover:bg-slate-50'
-                  ]"
-                >
-                  <div class="w-4 h-4 rounded-full overflow-hidden bg-slate-200 flex items-center justify-center" v-if="getAvatar(char)">
-                    <img :src="getAvatar(char)" class="w-full h-full object-cover" @error="handleImgError">
-                  </div>
+                <button @click.stop="toggleMenu(axis, i)" class="px-3 sm:px-4 py-2 rounded-lg border text-xs sm:text-sm font-semibold transition-all relative z-20 flex items-center gap-1.5 border-slate-200"
+                  :class="activeMenu.axis === axis && activeMenu.charIdx === i ? 'bg-slate-800 border-slate-800 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-50'">
+                  <div class="w-4 h-4 rounded-full overflow-hidden bg-slate-200 flex items-center justify-center" v-if="getAvatar(char)"><img :src="getAvatar(char)" class="w-full h-full object-cover" @error="handleImgError"></div>
                   + {{ char || `角色 ${i+1}` }}
                 </button>
-                
                 <div v-if="activeMenu.axis === axis && activeMenu.charIdx === i" @click.stop class="skill-popup absolute left-0 top-full mt-2 bg-white border border-slate-200 shadow-xl rounded-xl p-3 z-50 w-[280px] sm:w-[300px] flex flex-wrap gap-2 animate-pop">
                   <div class="w-full flex justify-between items-center mb-1 px-1">
                     <span class="text-[11px] font-bold text-slate-400 tracking-wider">选择录入项</span>
                     <button @click.stop="closeMenu" class="w-6 h-6 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 transition-colors">✕</button>
                   </div>
-                  <button v-for="(sk, key) in SKILLS" :key="key" @click="addSkill(axis, i, key)" class="px-3 py-2.5 rounded-lg text-xs font-semibold transition-all flex-grow text-center text-white shadow-sm hover:opacity-90 active:scale-95" :class="CHAR_BG_COLORS[i]">
-                    {{ sk.menuLabel }}
-                  </button>
+                  <button v-for="(sk, key) in SKILLS" :key="key" @click="addSkill(axis, i, key)" class="px-3 py-2.5 rounded-lg text-xs font-semibold transition-all flex-grow text-center text-white shadow-sm hover:opacity-90 active:scale-95" :class="CHAR_BG_COLORS[i]">{{ sk.menuLabel }}</button>
                 </div>
               </div>
             </div>
@@ -569,7 +578,7 @@
     <!-- 自定义技能弹窗 -->
     <div v-if="customModal.show" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" @click="cancelCustom"></div>
-      <div class="bg-white rounded-3xl shadow-2xl w-full max-sm p-6 sm:p-8 animate-pop relative z-10">
+      <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 sm:p-8 animate-pop relative z-10">
         <h3 class="text-lg font-bold text-slate-800 mb-2">自定义技能名称</h3>
         <p class="text-xs text-slate-400 mb-6 font-medium">例如：蹭闪、E亮起时切人等</p>
         <input 
@@ -617,6 +626,52 @@
       </div>
     </div>
 
+    <!-- 删除确认弹窗 -->
+    <div v-if="deleteConfirmModal.show" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" @click="deleteConfirmModal.show = false"></div>
+      <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 animate-pop relative z-10">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center shrink-0">
+            <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+          </div>
+          <div>
+            <h3 class="text-lg font-bold text-slate-800">确认删除</h3>
+            <p class="text-xs text-slate-400 font-medium mt-0.5">此操作不可逆，请谨慎操作</p>
+          </div>
+        </div>
+        <div class="flex gap-3 mt-2">
+          <button @click="deleteConfirmModal.show = false" class="flex-1 px-4 py-3 rounded-xl bg-slate-100 text-slate-600 font-bold text-sm hover:bg-slate-200 transition-colors">取消</button>
+          <button @click="confirmDelete" class="flex-1 px-4 py-3 rounded-xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 transition-colors shadow-md shadow-red-100">确认删除</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 上传确认弹窗 -->
+    <div v-if="uploadConfirmModal.show" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" @click="uploadConfirmModal.show = false"></div>
+      <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 sm:p-8 animate-pop relative z-10">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
+            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+          </div>
+          <div>
+            <h3 class="text-lg font-bold text-slate-800">{{ uploadConfirmModal.team?._onlineId ? '更新广场内容' : '发布到广场' }}</h3>
+            <p class="text-xs text-slate-400 font-medium mt-0.5">{{ uploadConfirmModal.team?._onlineId ? '将覆盖广场上已发布的版本' : '发布后所有人都可以看到这个队伍' }}</p>
+          </div>
+        </div>
+        <p class="text-sm text-slate-600 font-medium mb-6">{{ uploadConfirmModal.team?._onlineId ? '操作完成后，是否保留本地副本？' : '发布成功后，是否保留本地副本？' }}</p>
+        <div class="flex flex-col gap-3">
+          <button @click="confirmUpload(true)" :disabled="isSaving" class="w-full px-4 py-3 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 shadow-md shadow-blue-100 transition-colors disabled:opacity-50">
+            {{ isSaving ? '处理中...' : (uploadConfirmModal.team?._onlineId ? '更新并保留本地副本' : '发布并保留本地副本') }}
+          </button>
+          <button @click="confirmUpload(false)" :disabled="isSaving" class="w-full px-4 py-3 rounded-xl bg-slate-100 text-slate-600 font-bold text-sm hover:bg-slate-200 transition-colors disabled:opacity-50">
+            {{ uploadConfirmModal.team?._onlineId ? '更新后删除本地副本' : '发布后删除本地副本' }}
+          </button>
+          <button @click="uploadConfirmModal.show = false" class="w-full px-4 py-2 text-slate-400 text-sm font-semibold hover:text-slate-600 transition-colors">取消</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Toast通知容器 -->
     <div class="fixed top-4 right-4 z-[200] flex flex-col gap-2 pointer-events-none">
       <div v-for="toast in toasts" :key="toast.id"
@@ -625,6 +680,207 @@
         <svg v-if="toast.type === 'success'" class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
         <svg v-else class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
         {{ toast.message }}
+      </div>
+    </div>
+
+    <!-- ======================== 本地队伍库视图 ======================== -->
+    <div v-if="viewMode === 'local'" class="animate-pop">
+      <div class="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-3 mb-5 flex items-center gap-3">
+        <svg class="w-5 h-5 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path></svg>
+        <div>
+          <p class="text-sm font-bold text-amber-800">我的本地队伍</p>
+          <p class="text-xs text-amber-600 font-medium">以下队伍仅存储在你的浏览器中，不会自动上传。可导入/导出 JSON 备份，或在编辑界面选择发布到广场。</p>
+        </div>
+      </div>
+      <div v-if="localTeams.length === 0" class="text-center py-20 text-slate-400 font-medium">
+        <svg class="w-14 h-14 mx-auto mb-4 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path></svg>
+        <p class="mb-4">本地队伍列表是空的</p>
+        <button @click="createLocalTeam" class="bg-slate-800 text-white px-5 py-2.5 rounded-xl font-semibold text-sm hover:bg-slate-700 transition-colors">新建排轴</button>
+      </div>
+      <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div v-for="team in localTeams" :key="team.localId"
+          class="bg-white rounded-2xl shadow-sm hover:shadow-md transition-all p-6 border border-slate-200 flex flex-col group cursor-pointer hover:-translate-y-1"
+          @click="openLocalView(team)">
+          <div class="flex justify-between items-start mb-3">
+            <h3 class="font-bold text-xl text-slate-800 truncate pr-2">{{ team.name || '(未命名)' }}</h3>
+            <span class="text-[10px] text-slate-300 font-medium whitespace-nowrap shrink-0">{{ relativeTime(team.updated_at || team.created_at) }}</span>
+          </div>
+          <div class="flex items-center gap-2 mb-4">
+            <span class="text-xs font-black px-3 py-1 rounded-lg border-2 tracking-wide" :class="DIFFICULTY_TAG_COLORS[team.difficulty] || 'bg-slate-50 text-slate-500 border-slate-200'">{{ team.difficulty || '未设难度' }}</span>
+            <div class="flex flex-wrap gap-1.5 ml-auto">
+              <span v-for="mode in (team.modes || [])" :key="mode" class="text-[10px] border px-1.5 py-0.5 rounded-md font-semibold" :class="MODE_TAG_COLORS[mode] || 'bg-amber-50 text-amber-600 border-amber-100'">{{ mode }}</span>
+            </div>
+          </div>
+          <div class="flex gap-4 mb-5">
+            <div v-for="(char, i) in (team.chars || [])" :key="i" class="flex items-center gap-2">
+              <div class="char-avatar">
+                <img v-if="getAvatar(char)" :src="getAvatar(char)" class="avatar-img" @error="handleImgError">
+                <span v-else>{{ (char || '?')[0] }}</span>
+              </div>
+              <span class="text-sm font-bold" :class="CHAR_TEXT_COLORS[i]">{{ char || '?' }}</span>
+            </div>
+          </div>
+          <div class="mt-auto border-t border-slate-100 pt-3 flex justify-between items-center">
+            <p class="text-xs text-slate-400 line-clamp-1 font-medium">{{ team.remark || '暂无备注…' }}</p>
+            <div class="flex gap-2 ml-2 shrink-0">
+              <button @click.stop="editLocalTeam(team)" class="text-xs text-blue-500 font-semibold hover:underline">编辑</button>
+              <button @click.stop="openDeleteConfirm('local', team.localId)" class="text-xs text-red-500 font-semibold hover:underline">删除</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================== 本地编辑视图 ======================== -->
+    <div v-if="viewMode === 'localEdit' && localEditTeam" class="animate-pop">
+      <!-- 提示横幅 -->
+      <div class="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-3 mb-5 flex items-center gap-3">
+        <svg class="w-5 h-5 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"></path></svg>
+        <p class="text-xs text-amber-700 font-semibold">本地编辑模式 — 数据仅保存在你的浏览器中。填写视频链接后可点击「发布到广场」与所有人分享。</p>
+      </div>
+
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sm:p-7 mb-5">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-5">
+          <div class="space-y-4">
+            <div>
+              <label class="text-xs font-bold text-slate-500 mb-1 block">配队名称</label>
+              <input v-model="localEditTeam.name" class="font-bold text-base text-slate-800 w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 focus:border-blue-400 outline-none" placeholder="输入配队名称">
+            </div>
+            <div>
+              <label class="text-xs font-bold text-slate-500 mb-1 block">作者昵称 <span class="text-slate-400 font-normal">留空默认为「漂泊者」</span></label>
+              <input v-model="localEditTeam.author_name" class="text-sm font-semibold text-slate-700 w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 outline-none" placeholder="你的名字">
+            </div>
+            <div>
+              <label class="text-xs font-bold text-slate-500 mb-1 block">角色阵容</label>
+              <div class="flex flex-wrap gap-4">
+                <div v-for="(char, i) in localEditTeam.chars" :key="i" class="relative">
+                  <div class="flex items-center gap-2">
+                    <div class="char-avatar-lg">
+                      <img v-if="getAvatar(char)" :src="getAvatar(char)" class="avatar-img" @error="handleImgError">
+                      <span v-else>{{ (char || '?')[0] }}</span>
+                    </div>
+                    <button @click.stop="openLocalCharSelect(i)" class="px-3 py-1.5 w-24 sm:w-28 text-sm font-semibold text-center bg-slate-50 border border-slate-200 focus:border-blue-400 rounded-lg outline-none cursor-pointer hover:bg-white truncate transition-colors" :class="CHAR_TEXT_COLORS[i]">{{ char }}</button>
+                  </div>
+                  <div v-if="activeLocalCharSelectIdx === i" @click.stop class="absolute left-0 top-full mt-2 bg-white border border-slate-200 shadow-xl rounded-xl p-3 z-50 w-[300px] sm:w-[340px] animate-pop">
+                    <div class="relative mb-3">
+                      <svg class="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                      <input v-model="charSearchQuery" class="w-full bg-slate-50 border border-slate-200 rounded-lg pl-8 pr-3 py-2 text-sm outline-none focus:border-blue-400 focus:bg-white transition-colors" placeholder="搜索角色名...">
+                    </div>
+                    <div class="max-h-[240px] overflow-y-auto grid grid-cols-4 gap-2 pr-1 show-scrollbar">
+                      <button v-for="name in filteredCharOptions" :key="name" @click="selectLocalChar(i, name)" class="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-slate-100 transition-colors active:scale-95">
+                        <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-slate-200 overflow-hidden flex shrink-0 border border-slate-100 shadow-sm">
+                          <img v-if="getAvatar(name)" :src="getAvatar(name)" @error="handleImgError" class="w-full h-full object-cover">
+                        </div>
+                        <span class="text-[10px] sm:text-[11px] font-bold text-slate-700 w-full text-center leading-tight">{{ name }}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="space-y-4">
+            <div>
+              <label class="text-xs font-bold text-slate-500 mb-1 flex items-center gap-1"><span class="text-red-500">*</span> 排轴难度 (必选一项)</label>
+              <div class="flex flex-wrap gap-2">
+                <label v-for="diff in DIFFICULTY_OPTIONS" :key="diff" class="cursor-pointer">
+                  <input type="radio" v-model="localEditTeam.difficulty" :value="diff" class="hidden peer">
+                  <div class="px-3 py-1.5 rounded-lg border text-sm font-semibold transition-colors border-slate-200 text-slate-600 bg-white hover:bg-slate-50 peer-checked:text-white" :class="DIFFICULTY_COLORS[diff]">{{ diff }}</div>
+                </label>
+              </div>
+            </div>
+            <div>
+              <label class="text-xs font-bold text-slate-500 mb-1 flex items-center gap-1">适用场景 (可多选)</label>
+              <div class="flex flex-wrap gap-2">
+                <label v-for="mode in MODE_OPTIONS" :key="mode" class="cursor-pointer" @click.stop>
+                  <input type="checkbox" v-model="localEditTeam.modes" :value="mode" class="hidden peer">
+                  <div class="px-3 py-1.5 rounded-lg border text-sm font-semibold transition-colors border-slate-200 text-slate-600 bg-white hover:bg-slate-50 peer-checked:text-white" :class="MODE_COLORS[mode]">{{ mode }}</div>
+                </label>
+              </div>
+            </div>
+            <div>
+              <label class="text-xs font-bold text-slate-500 mb-1 flex items-center gap-1">参考视频链接 <span class="text-slate-400 font-normal">(发布时必填)</span></label>
+              <input v-model="localEditTeam.video" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:border-blue-400 outline-none" placeholder="粘贴B站/YouTube 链接">
+            </div>
+          </div>
+        </div>
+        <div class="mb-5">
+          <label class="text-xs font-bold text-slate-500 mb-1 block">打法备注</label>
+          <textarea v-model="localEditTeam.remark" rows="2" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:border-blue-400 outline-none resize-y" placeholder="在此输入配队备注…（例如角色链数、武器、共鸣效率等要求）"></textarea>
+        </div>
+        <div class="bg-blue-50 border border-blue-100 p-3 rounded-xl mb-6 text-[12px] text-blue-600 flex flex-wrap gap-x-6 gap-y-2 items-center shadow-sm">
+          <div class="flex items-center gap-1.5 font-bold">
+            <svg class="w-4 h-4 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor"><circle cx="10" cy="10" r="9" fill="#3b82f6"/><circle cx="10" cy="6.5" r="1.2" fill="white"/><rect x="9" y="9" width="2" height="5.5" rx="1" fill="white"/></svg>
+            操作指南:
+          </div>
+          <div class="flex items-center gap-1">🖱️ <span class="font-semibold">左键步骤方块:</span> 调整连段(E1/E2)</div>
+          <div class="flex items-center gap-1">🖱️ <span class="font-semibold">右键步骤方块:</span> +1使用次数</div>
+          <div class="flex items-center gap-1">🖱️ <span class="font-semibold">双击步骤方块:</span> -1使用次数</div>
+          <div class="flex items-center gap-1">🖱️ <span class="font-semibold">拖拽步骤方块:</span> 调整位置</div>
+        </div>
+        <div class="space-y-5">
+          <div v-for="axis in ['startup', 'loop']" :key="'local-'+axis" class="bg-slate-50/50 rounded-2xl p-4 sm:p-5 border border-slate-100">
+            <div class="flex items-center gap-3 mb-4">
+              <span class="text-sm font-bold text-slate-700 tracking-wide">{{ axis === 'startup' ? '启动轴' : '循环轴' }}</span>
+              <div class="h-px flex-1 bg-slate-200/60"></div>
+            </div>
+            <div class="mobile-scroll">
+              <draggable v-model="localEditTeam[axis]" group="local-shared" item-key="id" :animation="150" class="flex flex-wrap content-start items-center min-h-[56px] w-full pb-2 rounded-xl bg-white border border-slate-200 p-3 sm:p-4 shadow-sm">
+                <template #item="{ element, index }">
+                  <div class="relative flex items-center shrink-0 group animate-pop mb-2 mt-1" style="cursor: grab">
+                    <div v-if="index > 0 && element.charIdx !== localEditTeam[axis][index-1].charIdx" class="flex items-center mx-2 shrink-0 select-none">
+                      <div class="bg-slate-100 border border-slate-200 text-slate-400 rounded-full p-1 shadow-sm"><svg class="w-3 h-3 sm:w-3.5 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path></svg></div>
+                    </div>
+                    <div v-else-if="index > 0" class="w-1 sm:w-1.5 shrink-0"></div>
+                    <div class="relative">
+                      <div v-if="activeStepSegId === element.id" @click.stop class="seg-bubble animate-pop">
+                        <button v-for="v in [0,1,2,3,4,5]" :key="v" @click="setSegment(element, v)" class="seg-btn" :class="element.seg === v ? 'active' : ''">{{ v === 0 ? '无' : v }}</button>
+                      </div>
+                      <div v-if="element.count > 1" class="count-badge">×{{ element.count }}</div>
+                      <div class="flex items-center px-2.5 sm:px-3 py-1.5 rounded-lg shadow-sm border border-black/5 select-none transition-all duration-150"
+                           :class="[CHAR_BG_COLORS[element.charIdx], 'hover:-translate-y-0.5 hover:shadow-md']"
+                           @click.stop="toggleSegBubble(element.id)"
+                           @contextmenu.prevent="adjustCount(element, 1)"
+                           @dblclick="adjustCount(element, -1)">
+                        <div v-if="index === 0 || element.charIdx !== localEditTeam[axis][index-1].charIdx" class="flex items-center mr-1.5 sm:mr-2">
+                          <div class="w-5 h-5 rounded-full overflow-hidden bg-white/20 flex items-center justify-center mr-1" v-if="getAvatar(localEditTeam.chars[element.charIdx])">
+                            <img :src="getAvatar(localEditTeam.chars[element.charIdx])" class="w-full h-full object-cover" @error="handleImgError">
+                          </div>
+                          <span class="bg-white/20 px-1.5 sm:px-2 py-0.5 rounded-md text-[10px] sm:text-[11px] font-bold shrink-0 text-white">{{ localEditTeam.chars[element.charIdx] || '未命名' }}</span>
+                        </div>
+                        <span class="font-bold tracking-wide text-xs sm:text-sm flex items-center shrink-0 text-white">
+                          {{ element.skillKey === 'Custom' ? element.customText : SKILLS[element.skillKey].axisLabel }}{{ element.seg > 0 ? element.seg : '' }}
+                        </span>
+                        <button @click.stop="removeStep(localEditTeam, axis, index)" class="ml-1.5 sm:ml-2 w-4 h-4 flex items-center justify-center rounded-full bg-white/20 hover:bg-red-500 hover:text-white opacity-0 group-hover:opacity-100 transition-all text-white shrink-0">
+                          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+                <template #footer>
+                  <div v-if="localEditTeam[axis].length === 0" class="text-slate-400 text-xs sm:text-sm font-medium w-full text-center pointer-events-none py-1">轴为空，请在下方选择技能</div>
+                </template>
+              </draggable>
+            </div>
+            <div class="flex flex-wrap gap-2 sm:gap-3 relative mt-3">
+              <div v-for="(char, i) in localEditTeam.chars" :key="i" class="relative">
+                <button @click.stop="toggleLocalMenu(axis, i)" class="px-3 sm:px-4 py-2 rounded-lg border text-xs sm:text-sm font-semibold transition-all relative z-20 flex items-center gap-1.5 border-slate-200"
+                  :class="activeLocalMenu.axis === axis && activeLocalMenu.charIdx === i ? 'bg-slate-800 border-slate-800 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-50'">
+                  <div class="w-4 h-4 rounded-full overflow-hidden bg-slate-200 flex items-center justify-center" v-if="getAvatar(char)"><img :src="getAvatar(char)" class="w-full h-full object-cover" @error="handleImgError"></div>
+                  + {{ char || `角色 ${i+1}` }}
+                </button>
+                <div v-if="activeLocalMenu.axis === axis && activeLocalMenu.charIdx === i" @click.stop class="skill-popup absolute left-0 top-full mt-2 bg-white border border-slate-200 shadow-xl rounded-xl p-3 z-50 w-[280px] sm:w-[300px] flex flex-wrap gap-2 animate-pop">
+                  <div class="w-full flex justify-between items-center mb-1 px-1">
+                    <span class="text-[11px] font-bold text-slate-400 tracking-wider">选择录入项</span>
+                    <button @click.stop="closeLocalMenu" class="w-6 h-6 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 transition-colors">✕</button>
+                  </div>
+                  <button v-for="(sk, key) in SKILLS" :key="key" @click="addLocalSkill(axis, i, key)" class="px-3 py-2.5 rounded-lg text-xs font-semibold transition-all flex-grow text-center text-white shadow-sm hover:opacity-90 active:scale-95" :class="CHAR_BG_COLORS[i]">{{ sk.menuLabel }}</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -875,6 +1131,23 @@
         const pendingReportCount = ref(0);
         const isGeneratingImage = ref(false);
 
+        // 本地队伍
+        const LOCAL_STORAGE_KEY = 'mc_local_teams';
+        const loadLocalTeams = () => {
+          try { return JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '[]'); } catch { return []; }
+        };
+        const localTeams = ref(loadLocalTeams());
+        const saveLocalTeamsToStorage = () => {
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(localTeams.value));
+        };
+        const localEditTeam = ref(null);
+        const activeLocalMenu = ref({ axis: null, charIdx: null });
+        const activeLocalCharSelectIdx = ref(null);
+        // 上传确认弹窗
+        const uploadConfirmModal = ref({ show: false, team: null });
+        // 删除确认弹窗
+        const deleteConfirmModal = ref({ show: false, type: null, id: null });
+
         const DIFFICULTY_COLORS = {
           '轮切轴': 'peer-checked:bg-emerald-500 peer-checked:border-emerald-500',
           '轮椅轴': 'peer-checked:bg-lime-500 peer-checked:border-lime-500',
@@ -969,7 +1242,7 @@
           if (sortOrder.value === 'likes') {
             result.sort((a, b) => (b.likes || 0) - (a.likes || 0));
           } else {
-            result.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            result.sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at));
           }
           return result.slice(0, currentPage.value * PAGE_SIZE);
         });
@@ -997,6 +1270,13 @@
 
         const isAuthor = computed(() => {
           return detailTeam.value && (detailTeam.value.author_id === deviceId || isAdmin.value);
+        });
+
+        // 查看页是否可编辑（广场：作者/管理员；本地：始终可以）
+        const canEditViewTeam = computed(() => {
+          if (!viewTeam.value) return false;
+          if (viewTeam.value.isLocal) return true;
+          return viewTeam.value.author_id === deviceId || isAdmin.value;
         });
 
         const getAvatar = (name) => {
@@ -1039,6 +1319,8 @@
           document.addEventListener('click', () => {
             closeMenu();
             closeCharSelect();
+            closeLocalMenu();
+            closeLocalCharSelect();
             activeStepSegId.value = null;
           });
           // 无限滚动 IntersectionObserver
@@ -1056,7 +1338,7 @@
 
         const createNewTeam = () => {
           detailTeam.value = {
-            id: null, author_id: deviceId, author_name: localStorage.getItem('mc_author_name') || '漂泊者',
+            id: null, author_id: deviceId, author_name: '',
             name: '', chars: ['共鸣者1', '共鸣者2', '共鸣者3'], remark: '',
             video: '', difficulty: '', modes: [], startup: [], loop: []
           };
@@ -1071,26 +1353,111 @@
           window.scrollTo({ top: 0, behavior: 'smooth' });
         };
 
-        // 从查看页切换到编辑页（仅作者）
-        const switchToEdit = () => {
+        // 查看页「编辑」按钮 - 广场队伍转到本地编辑器，本地队伍直接编辑
+        const editFromView = () => {
           if (!viewTeam.value) return;
-          detailTeam.value = JSON.parse(JSON.stringify(viewTeam.value));
-          viewMode.value = 'detail';
+          if (viewTeam.value.isLocal) {
+            localEditTeam.value = JSON.parse(JSON.stringify(viewTeam.value));
+            viewMode.value = 'localEdit';
+          } else {
+            // 广场队伍：先存为本地草稿副本再编辑
+            const draft = JSON.parse(JSON.stringify(viewTeam.value));
+            draft.localId = 'local_' + Math.random().toString(36).substr(2,9) + Date.now().toString(36);
+            draft.updated_at = new Date().toISOString();
+            draft.created_at = draft.created_at || new Date().toISOString();
+            draft._onlineId = draft.id; // 记住原始广场ID
+            delete draft.id;
+            const existing = localTeams.value.findIndex(t => t._onlineId === viewTeam.value.id);
+            if (existing >= 0) {
+              localEditTeam.value = JSON.parse(JSON.stringify(localTeams.value[existing]));
+            } else {
+              localTeams.value.unshift(draft);
+              saveLocalTeamsToStorage();
+              localEditTeam.value = JSON.parse(JSON.stringify(draft));
+            }
+            viewMode.value = 'localEdit';
+          }
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         };
 
-        // 保留旧的 openDetail 供卡片底部"编辑"按钮直接使用
+        // 查看页删除
+        const deleteViewTeam = () => {
+          if (!viewTeam.value) return;
+          if (viewTeam.value.isLocal) {
+            openDeleteConfirm('local', viewTeam.value.localId);
+          } else {
+            openDeleteConfirm('online', viewTeam.value.id);
+          }
+        };
+
+        // 卡片底部编辑按钮 - 管理员走 openDetail，普通作者走本地编辑器
+        const editFromCard = (team) => {
+          if (isAdmin.value) {
+            detailTeam.value = JSON.parse(JSON.stringify(team));
+            viewMode.value = 'detail';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            return;
+          }
+          // 普通作者：存为本地草稿再编辑
+          const existing = localTeams.value.findIndex(t => t._onlineId === team.id);
+          if (existing >= 0) {
+            localEditTeam.value = JSON.parse(JSON.stringify(localTeams.value[existing]));
+          } else {
+            const draft = JSON.parse(JSON.stringify(team));
+            draft.localId = 'local_' + Math.random().toString(36).substr(2,9) + Date.now().toString(36);
+            draft._onlineId = draft.id;
+            delete draft.id;
+            draft.updated_at = new Date().toISOString();
+            localTeams.value.unshift(draft);
+            saveLocalTeamsToStorage();
+            localEditTeam.value = JSON.parse(JSON.stringify(draft));
+          }
+          viewMode.value = 'localEdit';
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        // 保留旧的 openDetail 供管理员卡片编辑按钮使用（管理员直接发布到广场）
         const openDetail = (team) => {
           detailTeam.value = JSON.parse(JSON.stringify(team));
           viewMode.value = 'detail';
           window.scrollTo({ top: 0, behavior: 'smooth' });
         };
 
+        // 本地库卡片点击 → 查看模式
+        const openLocalView = (team) => {
+          const t = JSON.parse(JSON.stringify(team));
+          t.isLocal = true;
+          viewTeam.value = t;
+          viewMode.value = 'view';
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        // 本地编辑器顶部删除按钮
+        const deleteLocalTeamFromEditor = () => {
+          if (!localEditTeam.value) return;
+          openDeleteConfirm('local', localEditTeam.value.localId);
+        };
+
         const backToGrid = () => {
+          if (viewMode.value === 'localEdit') {
+            viewMode.value = 'local';
+            localEditTeam.value = null;
+            closeLocalMenu();
+            closeLocalCharSelect();
+            return;
+          }
+          if (viewMode.value === 'view' && viewTeam.value?.isLocal) {
+            viewMode.value = 'local';
+            viewTeam.value = null;
+            return;
+          }
           viewMode.value = 'grid';
           detailTeam.value = null;
           viewTeam.value = null;
+          localEditTeam.value = null;
           closeMenu();
           closeCharSelect();
+          closeLocalMenu();
         };
 
         const openCharSelect = (idx) => {
@@ -1108,19 +1475,23 @@
           const t = detailTeam.value;
           if (!t.name.trim()) return showToast('请输入配队名称', 'error');
           if (!t.difficulty) return showToast('请选择排轴难度', 'error');
-          if (!t.video.trim()) return showToast('请提供参考视频链接', 'error');
-          if (!isAdmin.value) localStorage.setItem('mc_author_name', t.author_name);
           isSaving.value = true;
           const payload = {
+            id: t.id || undefined,
             author_id: t.author_id, author_name: t.author_name || '漂泊者',
             name: t.name, chars: t.chars, remark: t.remark,
             video: t.video, difficulty: t.difficulty,
             modes: t.modes, startup: t.startup, loop: t.loop
           };
-          if (t.id) payload.id = t.id;
           let error;
           if (isAdmin.value && t.id) {
-            ({ error } = await supabaseClient.rpc('admin_upsert_team', { p_team: JSON.stringify(payload) }));
+            // 管理员编辑现有队伍，id 必须存在
+            payload.id = t.id;
+            ({ error } = await supabaseClient.rpc('admin_upsert_team', { p_team: payload }));
+          } else if (!t.id) {
+            // 新建（管理员新建或普通用户）
+            const { id: _id, ...insertPayload } = payload;
+            ({ error } = await supabaseClient.from('teams').insert(insertPayload));
           } else {
             ({ error } = await supabaseClient.from('teams').upsert(payload));
           }
@@ -1129,17 +1500,36 @@
           else { showToast('发布成功！'); fetchTeams(); backToGrid(); }
         };
 
-        const deleteTeam = async (id) => {
-          if (!confirm('确定要删除这个配队吗？操作不可逆。')) return;
-          let error;
-          if (isAdmin.value) {
-            ({ error } = await supabaseClient.rpc('admin_delete_team', { p_team_id: id }));
-          } else {
-            ({ error } = await supabaseClient.from('teams').delete().eq('id', id).eq('author_id', deviceId));
-          }
-          if (!error) { teams.value = teams.value.filter(t => t.id !== id); showToast('删除成功'); }
-          else showToast('删除失败: ' + error.message, 'error');
+        // 自定义删除确认
+        const openDeleteConfirm = (type, id) => {
+          deleteConfirmModal.value = { show: true, type, id };
         };
+
+        const confirmDelete = async () => {
+          const { type, id } = deleteConfirmModal.value;
+          deleteConfirmModal.value.show = false;
+          if (type === 'local') {
+            localTeams.value = localTeams.value.filter(t => t.localId !== id);
+            saveLocalTeamsToStorage();
+            showToast('已删除');
+            if (viewMode.value === 'view' && viewTeam.value?.localId === id) backToGrid();
+            if (viewMode.value === 'localEdit' && localEditTeam.value?.localId === id) { localEditTeam.value = null; viewMode.value = 'local'; }
+          } else {
+            let error;
+            if (isAdmin.value) {
+              ({ error } = await supabaseClient.rpc('admin_delete_team', { p_team_id: id }));
+            } else {
+              ({ error } = await supabaseClient.rpc('author_delete_team', { p_team_id: id, p_author_id: deviceId }));
+            }
+            if (!error) {
+              teams.value = teams.value.filter(t => t.id !== id);
+              showToast('删除成功');
+              if (viewMode.value === 'view') backToGrid();
+            } else showToast('删除失败: ' + error.message, 'error');
+          }
+        };
+
+        const deleteTeam = async (id) => { openDeleteConfirm('online', id); };
 
         // 时间格式化
         const relativeTime = (dateStr) => {
@@ -1194,9 +1584,7 @@
 
         const fetchReports = async () => {
           adminLoading.value = true;
-          const { data, error } = await supabaseClient
-            .from('reports').select('*')
-            .order('created_at', { ascending: false });
+          const { data, error } = await supabaseClient.rpc('admin_get_reports');
           if (!error && data) {
             reports.value = data;
             pendingReportCount.value = data.filter(r => r.status === 'pending').length;
@@ -1205,7 +1593,7 @@
         };
 
         const resolveReport = async (id) => {
-          const { error } = await supabaseClient.from('reports').update({ status: 'resolved' }).eq('id', id);
+          const { error } = await supabaseClient.rpc('admin_resolve_report', { p_report_id: id });
           if (!error) {
             const r = reports.value.find(r => r.id === id);
             if (r) r.status = 'resolved';
@@ -1214,7 +1602,222 @@
           } else showToast('操作失败', 'error');
         };
 
-        // Canvas 轴图生成
+        // ======== 本地队伍功能 ========
+        const openLocalLibrary = () => {
+          viewMode.value = 'local';
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        const createLocalTeam = () => {
+          localEditTeam.value = {
+            localId: 'local_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36),
+            name: '', author_name: '',
+            chars: ['共鸣者1', '共鸣者2', '共鸣者3'], remark: '',
+            video: '', difficulty: '', modes: [], startup: [], loop: [],
+            created_at: new Date().toISOString(), updated_at: new Date().toISOString()
+          };
+          viewMode.value = 'localEdit';
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        const editLocalTeam = (team) => {
+          localEditTeam.value = JSON.parse(JSON.stringify(team));
+          viewMode.value = 'localEdit';
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        const saveLocalTeam = () => {
+          if (!localEditTeam.value) return;
+          localEditTeam.value.updated_at = new Date().toISOString();
+          const idx = localTeams.value.findIndex(t => t.localId === localEditTeam.value.localId);
+          if (idx >= 0) localTeams.value[idx] = JSON.parse(JSON.stringify(localEditTeam.value));
+          else localTeams.value.unshift(JSON.parse(JSON.stringify(localEditTeam.value)));
+          saveLocalTeamsToStorage();
+          showToast('已保存到本地！');
+          viewMode.value = 'local';
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        const deleteLocalTeam = (localId) => {
+          openDeleteConfirm('local', localId);
+        };
+
+        const exportLocalTeams = () => {
+          if (localTeams.value.length === 0) return showToast('没有本地队伍可导出', 'error');
+          const blob = new Blob([JSON.stringify(localTeams.value, null, 2)], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a'); a.href = url;
+          a.download = `鸣潮本地队伍_${new Date().toLocaleDateString('zh-CN').replace(/\//g,'-')}.json`;
+          a.click(); URL.revokeObjectURL(url);
+          showToast('导出成功！');
+        };
+
+        const importLocalTeams = (e) => {
+          const file = e.target.files[0]; if (!file) return;
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            try {
+              const data = JSON.parse(ev.target.result);
+              if (!Array.isArray(data)) throw new Error('格式错误');
+              // 保留现有，追加新的（按localId去重）
+              const existingIds = new Set(localTeams.value.map(t => t.localId));
+              let added = 0;
+              data.forEach(t => {
+                if (!t.localId) t.localId = 'local_' + Math.random().toString(36).substr(2, 9);
+                if (!existingIds.has(t.localId)) { localTeams.value.unshift(t); added++; }
+              });
+              saveLocalTeamsToStorage();
+              showToast(`导入成功，新增 ${added} 条队伍`);
+            } catch { showToast('导入失败，文件格式不正确', 'error'); }
+          };
+          reader.readAsText(file);
+          e.target.value = '';
+        };
+
+        // 复制广场队伍到本地（只带轴数据，不带视频/作者）
+        const copyTeamToLocal = (team) => {
+          const newLocal = {
+            localId: 'local_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36),
+            name: '来自广场的副本',
+            author_name: '',
+            chars: [...(team.chars || ['共鸣者1','共鸣者2','共鸣者3'])],
+            remark: '', video: '',
+            difficulty: team.difficulty || '',
+            modes: [...(team.modes || [])],
+            startup: JSON.parse(JSON.stringify(team.startup || [])),
+            loop: JSON.parse(JSON.stringify(team.loop || [])),
+            created_at: new Date().toISOString(), updated_at: new Date().toISOString()
+          };
+          localTeams.value.unshift(newLocal);
+          saveLocalTeamsToStorage();
+          showToast('已复制到本地队伍！视频链接不会一并复制。');
+        };
+
+        // 上传本地队伍到广场
+        const uploadLocalTeam = () => {
+          uploadConfirmModal.value = { show: true, team: localEditTeam.value };
+        };
+
+        const confirmUpload = async (keepLocal) => {
+          const t = uploadConfirmModal.value.team;
+          uploadConfirmModal.value.show = false;
+          if (!t.name || !t.name.trim()) return showToast('请填写配队名称', 'error');
+          if (!t.author_name || !t.author_name.trim()) t.author_name = '漂泊者';
+          const defaultCharNames = ['共鸣者1', '共鸣者2', '共鸣者3'];
+          const unsetChars = (t.chars || []).filter(c => !c || defaultCharNames.includes(c));
+          if (unsetChars.length > 0) return showToast('请为所有角色槽位选择角色', 'error');
+          if (!t.difficulty) return showToast('请选择排轴难度', 'error');
+          if (!t.modes || t.modes.length === 0) return showToast('请至少选择一个适用场景（深塔/海墟/矩阵）', 'error');
+          if (!t.video || !t.video.trim()) return showToast('发布到广场需要填写参考视频链接', 'error');
+          isSaving.value = true;
+          const isUpdate = !!t._onlineId;
+          let error;
+          let finalOnlineId = t._onlineId || null;
+
+          if (isUpdate) {
+            // 先尝试更新已发布队伍
+            const payload = {
+              id: t._onlineId, author_id: deviceId,
+              name: t.name, author_name: t.author_name || '漂泊者',
+              chars: t.chars, remark: t.remark, video: t.video,
+              difficulty: t.difficulty, modes: t.modes,
+              startup: t.startup, loop: t.loop
+            };
+            const { data: rowCount, error: updateError } = await supabaseClient.rpc('author_update_team', { p_team: payload });
+            error = updateError;
+            if (!error && rowCount === 0) {
+              // 广场记录已被删除，清除 _onlineId 改走新建
+              finalOnlineId = null;
+              const insertPayload = {
+                author_id: deviceId, author_name: t.author_name || '漂泊者',
+                name: t.name, chars: t.chars, remark: t.remark,
+                video: t.video, difficulty: t.difficulty,
+                modes: t.modes, startup: t.startup, loop: t.loop
+              };
+              const { data: newData, error: insertError } = await supabaseClient
+                .from('teams').insert(insertPayload).select('id').single();
+              error = insertError;
+              if (!error && newData) finalOnlineId = newData.id;
+            }
+            if (!error) {
+              // 同步最新数据回本地副本
+              const localIdx = localTeams.value.findIndex(lt => lt.localId === t.localId);
+              if (localIdx >= 0) {
+                localTeams.value[localIdx] = { ...t, _onlineId: finalOnlineId, updated_at: new Date().toISOString() };
+                saveLocalTeamsToStorage();
+              }
+            }
+          } else {
+            // 新投稿
+            const payload = {
+              author_id: deviceId, author_name: t.author_name || '漂泊者',
+              name: t.name, chars: t.chars, remark: t.remark,
+              video: t.video, difficulty: t.difficulty,
+              modes: t.modes, startup: t.startup, loop: t.loop
+            };
+            const { data, error: insertError } = await supabaseClient
+              .from('teams').insert(payload).select('id').single();
+            error = insertError;
+            if (!error && data) {
+              finalOnlineId = data.id;
+              // 同步最新数据回本地副本，并记录 _onlineId
+              const localIdx = localTeams.value.findIndex(lt => lt.localId === t.localId);
+              if (localIdx >= 0) {
+                localTeams.value[localIdx] = {
+                  ...t,
+                  _onlineId: finalOnlineId,
+                  updated_at: new Date().toISOString()
+                };
+                saveLocalTeamsToStorage();
+              }
+            }
+          }
+          isSaving.value = false;
+          if (error) return showToast((isUpdate ? '更新' : '发布') + '失败: ' + error.message, 'error');
+          showToast(isUpdate ? '广场内容已更新！' : '已成功发布到广场！');
+          if (!keepLocal) {
+            localTeams.value = localTeams.value.filter(lt => lt.localId !== t.localId);
+            saveLocalTeamsToStorage();
+          } else {
+            // 如果选择保留但本地根本没有这条记录（未保存过直接发布），补充插入
+            const exists = localTeams.value.findIndex(lt => lt.localId === t.localId) >= 0;
+            if (!exists) {
+              localTeams.value.unshift({ ...t, updated_at: new Date().toISOString() });
+              saveLocalTeamsToStorage();
+            }
+          }
+          fetchTeams();
+          viewMode.value = 'local';
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        // 本地编辑轴菜单
+        const toggleLocalMenu = (axis, charIdx) => {
+          if (activeLocalMenu.value.axis === axis && activeLocalMenu.value.charIdx === charIdx) closeLocalMenu();
+          else activeLocalMenu.value = { axis, charIdx };
+        };
+        const closeLocalMenu = () => { activeLocalMenu.value = { axis: null, charIdx: null }; };
+
+        const addLocalSkill = (axis, charIdx, skillKey) => {
+          if (skillKey === 'Custom') {
+            customModal.value = { show: true, axis, charIdx, val: '', isLocal: true };
+            nextTick(() => customInputRef.value?.focus());
+            return;
+          }
+          localEditTeam.value[axis].push({ id: 'step_'+Math.random().toString(36).substr(2,9), charIdx, skillKey, customText: '', count: 1, seg: 0 });
+        };
+
+        const openLocalCharSelect = (idx) => {
+          activeLocalCharSelectIdx.value = idx;
+          charSearchQuery.value = '';
+        };
+        const closeLocalCharSelect = () => { activeLocalCharSelectIdx.value = null; };
+        const selectLocalChar = (idx, name) => {
+          localEditTeam.value.chars[idx] = name;
+          closeLocalCharSelect();
+        };
+
+        // ======== Canvas 修复 ========
         const CHAR_COLORS_HEX = ['#3b82f6', '#f97316', '#10b981'];
         const CHAR_COLORS_LIGHT = ['#eff6ff', '#fff7ed', '#f0fdf4'];
 
@@ -1292,8 +1895,9 @@
 
             const rowCounts = axes.map(a => measureAxisRows(team[a.key]));
             const sectionHeights = rowCounts.map(r => 42 + r * (BLOCK_H + BLOCK_GAP) + 20);
-            const HEADER_H = 80;
-            const totalH = HEADER_H + sectionHeights.reduce((a, b) => a + b, 0) + PAD * 2 + 16;
+            const WATERMARK_H = 36;
+            const HEADER_H = 88;
+            const totalH = HEADER_H + sectionHeights.reduce((a, b) => a + b, 0) + PAD * 2 + 16 + WATERMARK_H;
             const totalW = CONTENT_W + PAD * 2;
 
             const canvas = document.createElement('canvas');
@@ -1316,13 +1920,20 @@
             ctx.fill();
             ctx.shadowBlur = 0;
 
-            // 标题区
+            // 标题区：队伍名单独一行，下一行才是难度+作者+角色
             let y = PAD + 8;
             ctx.fillStyle = '#0f172a';
             ctx.font = FONT_TITLE;
-            ctx.fillText(team.name, PAD + 8, y + 22);
+            // Truncate name if too long to fit
+            const maxNameW = totalW - PAD * 2 - 16;
+            let displayName = team.name;
+            while (ctx.measureText(displayName).width > maxNameW && displayName.length > 1) {
+              displayName = displayName.slice(0, -1);
+            }
+            if (displayName !== team.name) displayName = displayName.slice(0, -1) + '…';
+            ctx.fillText(displayName, PAD + 8, y + 22);
 
-            // 难度 + 作者 + 角色
+            // 难度 + 作者 + 角色（第二行，y+36）
             const diffColors = { 轮切轴: '#22c55e', 轮椅轴: '#84cc16', 进阶轴: '#f97316', 高难轴: '#f43f5e' };
             const diffColor = diffColors[team.difficulty] || '#94a3b8';
             ctx.font = FONT_SM;
@@ -1330,32 +1941,33 @@
             const diffW = ctx.measureText(team.difficulty).width + 16;
             ctx.strokeStyle = diffColor;
             ctx.lineWidth = 1.5;
-            roundRect(ctx, PAD + 8, y + 30, diffW, 20, 6);
+            roundRect(ctx, PAD + 8, y + 32, diffW, 20, 6);
             ctx.stroke();
-            ctx.fillText(team.difficulty, PAD + 16, y + 44);
+            ctx.fillText(team.difficulty, PAD + 16, y + 46);
 
             ctx.fillStyle = '#64748b';
-            ctx.fillText(team.author_name, PAD + 8 + diffW + 12, y + 44);
+            ctx.fillText(team.author_name, PAD + 8 + diffW + 12, y + 46);
 
-            // 角色头像行
+            // 角色头像行（同第二行右侧）
             let ax = PAD + 8 + diffW + 12 + ctx.measureText(team.author_name).width + 20;
             for (let i = 0; i < team.chars.length; i++) {
-              ctx.beginPath();
-              ctx.arc(ax + AVATAR_R, y + 36, AVATAR_R, 0, Math.PI * 2);
-              ctx.fillStyle = CHAR_COLORS_HEX[i];
-              ctx.fill();
               if (avatarImgs[i]) {
                 ctx.save();
                 ctx.beginPath();
-                ctx.arc(ax + AVATAR_R, y + 36, AVATAR_R, 0, Math.PI * 2);
+                ctx.arc(ax + AVATAR_R, y + 42, AVATAR_R, 0, Math.PI * 2);
                 ctx.clip();
-                ctx.drawImage(avatarImgs[i], ax, y + 36 - AVATAR_R, AVATAR_R * 2, AVATAR_R * 2);
+                ctx.drawImage(avatarImgs[i], ax, y + 42 - AVATAR_R, AVATAR_R * 2, AVATAR_R * 2);
                 ctx.restore();
+              } else {
+                ctx.beginPath();
+                ctx.arc(ax + AVATAR_R, y + 42, AVATAR_R, 0, Math.PI * 2);
+                ctx.fillStyle = CHAR_COLORS_HEX[i];
+                ctx.fill();
               }
               ctx.font = FONT_SM;
               ctx.fillStyle = CHAR_COLORS_HEX[i];
               const charNameW = ctx.measureText(team.chars[i]).width;
-              ctx.fillText(team.chars[i], ax + AVATAR_R * 2 + 5, y + 40);
+              ctx.fillText(team.chars[i], ax + AVATAR_R * 2 + 5, y + 46);
               ax += AVATAR_R * 2 + 5 + charNameW + 14;
             }
 
@@ -1412,10 +2024,11 @@
                 let headerW = 0;
                 if (showHeader) {
                   ctx.font = FONT_SM;
-                  headerW = AVATAR_R * 2 + 6 + ctx.measureText(team.chars[el.charIdx] || '').width + 10;
+                  headerW = AVATAR_R * 2 + 6 + ctx.measureText(team.chars[el.charIdx] || '').width + 16;
                   ctx.font = FONT;
                 }
-                const blockW = headerW + skillW + 24;
+                // Fix (a): ensure right padding is consistent (24px on both sides of skill text)
+                const blockW = headerW + skillW + 28;
 
                 // 换行检测
                 if (!isFirst && bx + (charSwitch ? 36 : BLOCK_GAP) + blockW > totalW - PAD - 14) {
@@ -1423,17 +2036,26 @@
                   by += BLOCK_H + BLOCK_GAP;
                 }
 
-                // 切人箭头
+                // 切人箭头 - drawn chevron, perfectly centered
                 if (charSwitch) {
-                  const arrowX = bx + 10;
                   const arrowCY = by + BLOCK_H / 2;
+                  const pillX = bx, pillW = 28, pillH = 24;
                   ctx.fillStyle = '#e2e8f0';
                   ctx.beginPath();
-                  ctx.roundRect(bx, arrowCY - 12, 28, 24, 12);
+                  ctx.roundRect(pillX, arrowCY - pillH / 2, pillW, pillH, pillH / 2);
                   ctx.fill();
-                  ctx.fillStyle = '#94a3b8';
-                  ctx.font = '700 14px sans-serif';
-                  ctx.fillText('›', bx + 8, arrowCY + 5);
+                  // Draw chevron: two lines forming >
+                  const cx = pillX + pillW / 2 - 1;
+                  const arrowSize = 5;
+                  ctx.strokeStyle = '#94a3b8';
+                  ctx.lineWidth = 2;
+                  ctx.lineCap = 'round';
+                  ctx.lineJoin = 'round';
+                  ctx.beginPath();
+                  ctx.moveTo(cx - arrowSize / 2, arrowCY - arrowSize);
+                  ctx.lineTo(cx + arrowSize / 2, arrowCY);
+                  ctx.lineTo(cx - arrowSize / 2, arrowCY + arrowSize);
+                  ctx.stroke();
                   bx += 36;
                 } else if (!isFirst) {
                   bx += BLOCK_GAP;
@@ -1505,10 +2127,10 @@
               y += secH + 8;
             }
 
-            // 底部水印
+            // 底部水印 - fix (c): proper bottom breathing room
             ctx.font = '500 11px "Noto Sans SC", system-ui, sans-serif';
             ctx.fillStyle = '#cbd5e1';
-            ctx.fillText('鸣潮排轴广场生成，手法非网站原创，仅供分享参考', PAD + 8, totalH - PAD / 2 - 2);
+            ctx.fillText('鸣潮排轴广场生成，手法非网站原创，仅供分享参考', PAD + 8, totalH - WATERMARK_H + 16);
 
             // 下载
             const link = document.createElement('a');
@@ -1568,9 +2190,10 @@
         };
 
         const confirmCustom = () => {
-          const { axis, charIdx, val } = customModal.value;
+          const { axis, charIdx, val, isLocal } = customModal.value;
           if (val && val.trim()) {
-            detailTeam.value[axis].push({ 
+            const target = isLocal ? localEditTeam.value : detailTeam.value;
+            target[axis].push({ 
               id: 'step_'+Math.random().toString(36).substr(2, 9), 
               charIdx, skillKey: 'Custom', 
               customText: val.trim(), count: 1, seg: 0 
@@ -1631,8 +2254,8 @@
             adminModal.value.show = false;
             showToast('管理员登录成功！');
             // 加载待处理举报数
-            const { data: rData } = await supabaseClient.from('reports').select('id').eq('status', 'pending');
-            if (rData) pendingReportCount.value = rData.length;
+            const { data: rData } = await supabaseClient.rpc('admin_get_reports');
+            if (rData) pendingReportCount.value = rData.filter(r => r.status === 'pending').length;
           } else {
             adminModal.value.error = '密码错误，请重试';
           }
@@ -1652,12 +2275,15 @@
           hasActiveFilters, activeFilterCount, allCharOptions,
           activeMenu, activeCharSelectIdx, charSearchQuery, filteredCharOptions,
           activeStepSegId, isLoading, isSaving, isLoadingMore, noMoreData, scrollSentinel,
-          isAuthor, isAdmin, adminModal, adminInputRef, customModal, customInputRef,
+          isAuthor, isAdmin, canEditViewTeam, adminModal, adminInputRef, customModal, customInputRef,
           toasts, reportModal, REPORT_REASONS, adminTab, reports, adminLoading, pendingReportCount,
           isGeneratingImage,
+          // local teams
+          localTeams, localEditTeam, activeLocalMenu, activeLocalCharSelectIdx,
+          uploadConfirmModal, deleteConfirmModal,
           DIFFICULTY_OPTIONS, MODE_OPTIONS, CHAR_BG_COLORS, CHAR_TEXT_COLORS, SKILLS,
           DIFFICULTY_COLORS, DIFFICULTY_TAG_COLORS, MODE_COLORS, MODE_TAG_COLORS,
-          fetchTeams, createNewTeam, openView, openDetail, switchToEdit, backToGrid,
+          fetchTeams, createNewTeam, openView, openDetail, backToGrid,
           publishTeam, deleteTeam, hasLiked, toggleLike, getAvatar, handleImgError,
           toggleMenu, closeMenu, addSkill, adjustCount, removeStep,
           openCharSelect, closeCharSelect, selectChar, toggleSegBubble, setSegment,
@@ -1665,7 +2291,14 @@
           toggleFilterChar, toggleFilterMode, toggleFilterDiff, resetAllFilters,
           getFilterModeActiveClass, getFilterDiffActiveClass,
           openAdminModal, verifyAdmin, logoutAdmin, openAdminPanel, fetchReports, resolveReport,
-          openReport, submitReport, relativeTime, absoluteTime, downloadAxisImage
+          openReport, submitReport, relativeTime, absoluteTime, downloadAxisImage,
+          // local team functions
+          openLocalLibrary, createLocalTeam, editLocalTeam, saveLocalTeam, deleteLocalTeam,
+          exportLocalTeams, importLocalTeams, copyTeamToLocal, uploadLocalTeam, confirmUpload,
+          toggleLocalMenu, closeLocalMenu, addLocalSkill,
+          openLocalCharSelect, closeLocalCharSelect, selectLocalChar,
+          openLocalView, editFromView, editFromCard, deleteViewTeam, deleteLocalTeamFromEditor,
+          openDeleteConfirm, confirmDelete
         };
       }
     });
