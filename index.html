@@ -264,7 +264,7 @@
           <!-- 难度标签突出展示 + 作者 -->
           <div class="flex items-center gap-2 mb-4">
             <span class="text-xs font-black px-3 py-1 rounded-lg border-2 tracking-wide" :class="DIFFICULTY_TAG_COLORS[team.difficulty] || 'bg-slate-50 text-slate-500 border-slate-200'">{{ team.difficulty }}</span>
-            <span class="text-[11px] bg-slate-100 text-slate-500 px-2.5 py-1 rounded-lg font-semibold border border-slate-200">{{ team.author_name }}</span>
+            <span class="text-[11px] bg-slate-100 text-slate-500 px-2.5 py-1 rounded-lg font-semibold border border-slate-200">作者: {{ team.author_name }}</span>
             <div class="flex flex-wrap gap-1.5 ml-auto">
               <span v-for="mode in team.modes" :key="mode"
                 class="text-[10px] border px-1.5 py-0.5 rounded-md font-semibold"
@@ -299,10 +299,31 @@
         </div>
       </div>
 
-      <!-- 无限滚动触发器 -->
-      <div ref="scrollSentinel" class="h-8 flex items-center justify-center mt-2">
-        <span v-if="isLoadingMore" class="text-xs text-slate-400 font-medium">加载更多...</span>
-        <span v-else-if="noMoreData && teams.length > 0" class="text-xs text-slate-300 font-medium">已加载全部内容</span>
+      <!-- 翻页控件 -->
+      <div v-if="totalFiltered > 0" class="flex items-center justify-center gap-2 mt-6 mb-2 flex-wrap">
+        <!-- 上一页 -->
+        <button @click="goToPage(currentPage - 1)" :disabled="currentPage === 1"
+          class="w-9 h-9 flex items-center justify-center rounded-xl border text-sm font-bold transition-all"
+          :class="currentPage === 1 ? 'border-slate-100 text-slate-200 cursor-not-allowed' : 'border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-800'">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path></svg>
+        </button>
+        <!-- 页码 -->
+        <template v-for="p in pageNumbers" :key="p">
+          <span v-if="p === '...'" class="w-9 h-9 flex items-center justify-center text-sm text-slate-300 font-bold select-none">…</span>
+          <button v-else @click="goToPage(p)"
+            class="w-9 h-9 flex items-center justify-center rounded-xl border text-sm font-bold transition-all"
+            :class="p === currentPage ? 'bg-slate-800 border-slate-800 text-white shadow-sm' : 'border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-800'">
+            {{ p }}
+          </button>
+        </template>
+        <!-- 下一页 -->
+        <button @click="goToPage(currentPage + 1)" :disabled="currentPage === totalPages"
+          class="w-9 h-9 flex items-center justify-center rounded-xl border text-sm font-bold transition-all"
+          :class="currentPage === totalPages ? 'border-slate-100 text-slate-200 cursor-not-allowed' : 'border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-800'">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path></svg>
+        </button>
+        <!-- 总数提示 -->
+        <span class="text-xs text-slate-300 font-medium ml-1">共 {{ totalFiltered }} 条</span>
       </div>
 
       <div v-if="!isLoading && filteredAndSortedTeams.length === 0" class="text-center py-16 text-slate-400 font-medium">
@@ -1144,11 +1165,10 @@
         };
 
         // 分页
-        const PAGE_SIZE = 12;
+        const PAGE_SIZE = 8;
         const currentPage = ref(1);
         const isLoadingMore = ref(false);
         const noMoreData = ref(false);
-        const scrollSentinel = ref(null);
 
         // 举报
         const REPORT_REASONS = ['内容错误', '视频失效', '重复内容', '低质量/恶意投稿', '其他'];
@@ -1277,7 +1297,7 @@
           } else {
             result.sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at));
           }
-          return result.slice(0, currentPage.value * PAGE_SIZE);
+          return result.slice((currentPage.value - 1) * PAGE_SIZE, currentPage.value * PAGE_SIZE);
         });
 
         const totalFiltered = computed(() => {
@@ -1335,16 +1355,29 @@
           isLoading.value = false;
         };
 
-        const loadMore = () => {
-          if (isLoadingMore.value || noMoreData.value) return;
-          const shown = currentPage.value * PAGE_SIZE;
-          if (shown >= totalFiltered.value) { noMoreData.value = true; return; }
-          isLoadingMore.value = true;
-          setTimeout(() => {
-            currentPage.value++;
-            isLoadingMore.value = false;
-            if (currentPage.value * PAGE_SIZE >= totalFiltered.value) noMoreData.value = true;
-          }, 300);
+        const totalPages = computed(() => Math.max(1, Math.ceil(totalFiltered.value / PAGE_SIZE)));
+
+        const pageNumbers = computed(() => {
+          const total = totalPages.value;
+          const cur = currentPage.value;
+          if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+          const pages = new Set([1, total, cur]);
+          if (cur > 1) pages.add(cur - 1);
+          if (cur < total) pages.add(cur + 1);
+          const sorted = Array.from(pages).sort((a, b) => a - b);
+          const result = [];
+          for (let i = 0; i < sorted.length; i++) {
+            if (i > 0 && sorted[i] - sorted[i - 1] > 1) result.push('...');
+            result.push(sorted[i]);
+          }
+          return result;
+        });
+
+        const goToPage = (page) => {
+          const p = Math.max(1, Math.min(page, totalPages.value));
+          if (p === currentPage.value) return;
+          currentPage.value = p;
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         };
 
         onMounted(() => {
@@ -1356,17 +1389,11 @@
             closeLocalCharSelect();
             activeStepSegId.value = null;
           });
-          // 无限滚动 IntersectionObserver
-          const observer = new IntersectionObserver((entries) => {
-            if (entries[0].isIntersecting && viewMode.value === 'grid') loadMore();
-          }, { threshold: 0.1 });
-          watch(scrollSentinel, (el) => { if (el) observer.observe(el); });
         });
 
         // 筛选/排序变化时重置分页
         watch([searchQuery, filterChars, filterModes, filterDiffs, sortOrder], () => {
           currentPage.value = 1;
-          noMoreData.value = false;
         }, { deep: true });
 
         const createNewTeam = () => {
@@ -1865,11 +1892,13 @@
             // 如果选择保留但本地根本没有这条记录（未保存过直接发布），补充插入
             const exists = localTeams.value.findIndex(lt => lt.localId === t.localId) >= 0;
             if (!exists) {
-              localTeams.value.unshift({ ...t, updated_at: new Date().toISOString() });
+              localTeams.value.unshift({ ...t, _onlineId: finalOnlineId, updated_at: new Date().toISOString() });
               saveLocalTeamsToStorage();
             }
           }
-          viewMode.value = 'local';
+          viewMode.value = 'grid';
+          localEditTeam.value = null;
+          localEditSnapshot.value = null;
           window.scrollTo({ top: 0, behavior: 'smooth' });
         };
 
@@ -1942,35 +1971,42 @@
             const mCtx = measureCanvas.getContext('2d');
 
             const CONTENT_W = 900;
+            const DRAW_LEFT = PAD + 14;
+            // totalW = CONTENT_W + PAD*2，所以 DRAW_RIGHT = CONTENT_W + PAD*2 - PAD - 14 = CONTENT_W + PAD - 14
+            const DRAW_RIGHT = CONTENT_W + PAD - 14;
+
             const measureAxisRows = (axisData) => {
               if (!axisData.length) return 1;
-              mCtx.font = FONT;
-              let x = 0; let rows = 1;
+              let bx = DRAW_LEFT;
+              let rows = 1;
               for (let i = 0; i < axisData.length; i++) {
                 const el = axisData[i];
                 const prev = axisData[i - 1];
                 const isFirst = i === 0;
                 const charSwitch = !isFirst && el.charIdx !== prev.charIdx;
-
-                // 切人箭头宽度
-                if (charSwitch) x += 36;
-                else if (!isFirst) x += BLOCK_GAP;
-
-                // 计算块宽
-                let blockW = 0;
                 const showHeader = isFirst || charSwitch;
+
+                // blockW 计算与渲染完全一致
+                mCtx.font = FONT;
+                const skillLabel = el.skillKey === 'Custom' ? el.customText : SKILLS[el.skillKey]?.axisLabel || el.skillKey;
+                const skillText = skillLabel + (el.seg > 0 ? String(el.seg) : '');
+                const skillW = mCtx.measureText(skillText).width;
+                let headerW = 0;
                 if (showHeader) {
                   mCtx.font = FONT_SM;
-                  const nameW = mCtx.measureText(team.chars[el.charIdx] || '').width;
-                  blockW += AVATAR_R * 2 + 6 + nameW + 12;
+                  headerW = AVATAR_R * 2 + 6 + mCtx.measureText(team.chars[el.charIdx] || '').width + 16;
                   mCtx.font = FONT;
                 }
-                const skillLabel = el.skillKey === 'Custom' ? el.customText : SKILLS[el.skillKey]?.axisLabel || el.skillKey;
-                const skillText = skillLabel + (el.seg > 0 ? el.seg : '') + (el.count > 1 ? `×${el.count}` : '');
-                blockW += mCtx.measureText(skillText).width + 24;
+                const blockW = headerW + skillW + 28;
 
-                if (x + blockW > CONTENT_W && !isFirst) { rows++; x = blockW + BLOCK_GAP; }
-                else { x += blockW; }
+                // 换行判断与渲染完全一致
+                if (!isFirst && bx + (charSwitch ? 36 : BLOCK_GAP) + blockW > DRAW_RIGHT) {
+                  rows++;
+                  bx = DRAW_LEFT + blockW + BLOCK_GAP;
+                } else {
+                  if (!isFirst) bx += charSwitch ? 36 : BLOCK_GAP;
+                  bx += blockW;
+                }
               }
               return rows;
             };
@@ -2388,7 +2424,8 @@
           searchQuery, sortOrder, filterPanelOpen, filterChars, filterModes, filterDiffs,
           hasActiveFilters, activeFilterCount, allCharOptions,
           activeMenu, activeCharSelectIdx, charSearchQuery, filteredCharOptions,
-          activeStepSegId, isLoading, isSaving, isLoadingMore, noMoreData, scrollSentinel,
+          activeStepSegId, isLoading, isSaving, isLoadingMore, noMoreData,
+          currentPage, totalPages, totalFiltered, pageNumbers, goToPage,
           isAuthor, isAdmin, canEditViewTeam, adminModal, adminInputRef, customModal, customInputRef,
           toasts, reportModal, REPORT_REASONS, adminTab, reports, adminLoading, pendingReportCount,
           isGeneratingImage,
