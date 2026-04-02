@@ -519,7 +519,7 @@
             </div>
             <div>
               <label class="text-xs font-bold text-slate-500 mb-1 flex items-center gap-1">参考视频链接 <span class="text-slate-400 font-normal">(发布时必填)</span></label>
-              <input v-model="detailTeam.video" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:border-blue-400 outline-none" placeholder="粘贴B站/YouTube 链接">
+              <input v-model="detailTeam.video" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:border-blue-400 outline-none" placeholder="粘贴 Bilibili 链接">
             </div>
           </div>
         </div>
@@ -741,25 +741,44 @@
           <p class="text-xs text-amber-600 font-medium">以下队伍仅存储在你的浏览器中，不会自动上传。可导入/导出 JSON 备份，或在编辑界面选择发布到广场。</p>
         </div>
       </div>
+
+      <!-- 搜索框 -->
+      <div v-if="localTeams.length > 0" class="bg-white rounded-2xl border border-slate-200 shadow-sm mb-5 p-3 sm:p-4">
+        <div class="relative max-w-sm">
+          <svg class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+          <input v-model="localSearchQuery" class="w-full pl-9 pr-8 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:border-slate-400 outline-none transition-colors" placeholder="搜索队伍名、角色名或备注…">
+          <button v-if="localSearchQuery" @click="localSearchQuery = ''" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </button>
+        </div>
+      </div>
+
       <div v-if="localTeams.length === 0" class="text-center py-20 text-slate-400 font-medium">
         <svg class="w-14 h-14 mx-auto mb-4 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path></svg>
         <p class="mb-4">本地队伍列表是空的</p>
         <button @click="createLocalTeam" class="bg-slate-800 text-white px-5 py-2.5 rounded-xl font-semibold text-sm hover:bg-slate-700 transition-colors">新建排轴</button>
       </div>
+      <div v-else-if="localPagedTeams.length === 0" class="text-center py-16 text-slate-400 font-medium">
+        <svg class="w-12 h-12 mx-auto mb-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        没有找到匹配的队伍
+      </div>
       <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <div v-for="team in localTeams" :key="team.localId"
-          class="bg-white rounded-2xl shadow-sm hover:shadow-md transition-all p-6 border border-slate-200 flex flex-col group cursor-pointer hover:-translate-y-1"
+        <div v-for="team in localPagedTeams" :key="team.localId"
+          class="bg-white rounded-2xl shadow-sm hover:shadow-md transition-all p-6 sm:p-7 border border-slate-200 flex flex-col group cursor-pointer hover:-translate-y-1"
           @click="openLocalView(team)">
           <div class="flex justify-between items-start mb-3">
-            <h3 class="font-bold text-xl text-slate-800 truncate pr-2">{{ team.name || '(未命名)' }}</h3>
+            <h3 class="font-bold text-xl sm:text-2xl text-slate-800 truncate pr-2">{{ team.name || '(未命名)' }}</h3>
             <span class="text-[10px] text-slate-300 font-medium whitespace-nowrap shrink-0">{{ relativeTime(team.updated_at || team.created_at) }}</span>
           </div>
+          <!-- 难度 + 作者 + 模式（与大厅一致） -->
           <div class="flex items-center gap-2 mb-4">
             <span class="text-xs font-black px-3 py-1 rounded-lg border-2 tracking-wide" :class="DIFFICULTY_TAG_COLORS[team.difficulty] || 'bg-slate-50 text-slate-500 border-slate-200'">{{ team.difficulty || '未设难度' }}</span>
+            <span class="text-[11px] bg-slate-100 text-slate-500 px-2.5 py-1 rounded-lg font-semibold border border-slate-200">{{ team.author_name || '漂泊者' }}</span>
             <div class="flex flex-wrap gap-1.5 ml-auto">
               <span v-for="mode in (team.modes || [])" :key="mode" class="text-[10px] border px-1.5 py-0.5 rounded-md font-semibold" :class="MODE_TAG_COLORS[mode] || 'bg-amber-50 text-amber-600 border-amber-100'">{{ mode }}</span>
             </div>
           </div>
+          <!-- 角色阵容 -->
           <div class="flex gap-4 mb-5">
             <div v-for="(char, i) in (team.chars || [])" :key="i" class="flex items-center gap-2">
               <div class="char-avatar">
@@ -777,6 +796,29 @@
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- 翻页控件 -->
+      <div v-if="localFilteredTeams.length > 0" class="flex items-center justify-center gap-2 mt-6 mb-2 flex-wrap">
+        <button @click="goToLocalPage(localCurrentPage - 1)" :disabled="localCurrentPage === 1"
+          class="w-9 h-9 flex items-center justify-center rounded-xl border text-sm font-bold transition-all"
+          :class="localCurrentPage === 1 ? 'border-slate-100 text-slate-200 cursor-not-allowed' : 'border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-800'">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path></svg>
+        </button>
+        <template v-for="p in localPageNumbers" :key="p">
+          <span v-if="p === '...'" class="w-9 h-9 flex items-center justify-center text-sm text-slate-300 font-bold select-none">…</span>
+          <button v-else @click="goToLocalPage(p)"
+            class="w-9 h-9 flex items-center justify-center rounded-xl border text-sm font-bold transition-all"
+            :class="p === localCurrentPage ? 'bg-slate-800 border-slate-800 text-white shadow-sm' : 'border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-800'">
+            {{ p }}
+          </button>
+        </template>
+        <button @click="goToLocalPage(localCurrentPage + 1)" :disabled="localCurrentPage === localTotalPages"
+          class="w-9 h-9 flex items-center justify-center rounded-xl border text-sm font-bold transition-all"
+          :class="localCurrentPage === localTotalPages ? 'border-slate-100 text-slate-200 cursor-not-allowed' : 'border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-800'">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path></svg>
+        </button>
+        <span class="text-xs text-slate-300 font-medium ml-1">共 {{ localFilteredTeams.length }} 条</span>
       </div>
     </div>
 
@@ -849,7 +891,7 @@
             </div>
             <div>
               <label class="text-xs font-bold text-slate-500 mb-1 flex items-center gap-1">参考视频链接 <span class="text-slate-400 font-normal">(发布时必填)</span></label>
-              <input v-model="localEditTeam.video" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:border-blue-400 outline-none" placeholder="粘贴B站/YouTube 链接">
+              <input v-model="localEditTeam.video" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:border-blue-400 outline-none" placeholder="粘贴 Bilibili 链接">
             </div>
           </div>
         </div>
@@ -1192,8 +1234,53 @@
         };
         const localEditTeam = ref(null);
         const localEditSnapshot = ref(null); // 进入编辑器时的初始快照，用于检测未保存改动
+        const localEditSource = ref('local'); // 进入编辑器前的来源视图，离开时返回
         const activeLocalMenu = ref({ axis: null, charIdx: null });
         const activeLocalCharSelectIdx = ref(null);
+        // 本地队伍搜索和分页
+        const localSearchQuery = ref('');
+        const localCurrentPage = ref(1);
+        const localFilteredTeams = computed(() => {
+          let result = [...localTeams.value];
+          if (localSearchQuery.value.trim()) {
+            const q = localSearchQuery.value.trim().toLowerCase();
+            result = result.filter(t =>
+              (t.name || '').toLowerCase().includes(q) ||
+              (t.author_name || '').toLowerCase().includes(q) ||
+              (t.chars || []).some(c => c.toLowerCase().includes(q)) ||
+              (t.remark || '').toLowerCase().includes(q)
+            );
+          }
+          return result;
+        });
+        const localTotalPages = computed(() => Math.max(1, Math.ceil(localFilteredTeams.value.length / PAGE_SIZE)));
+        const localPagedTeams = computed(() => {
+          const start = (localCurrentPage.value - 1) * PAGE_SIZE;
+          return localFilteredTeams.value.slice(start, start + PAGE_SIZE);
+        });
+        const localPageNumbers = computed(() => {
+          const total = localTotalPages.value;
+          const cur = localCurrentPage.value;
+          if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+          const pages = new Set([1, total, cur]);
+          if (cur > 1) pages.add(cur - 1);
+          if (cur < total) pages.add(cur + 1);
+          const sorted = Array.from(pages).sort((a, b) => a - b);
+          const result = [];
+          for (let i = 0; i < sorted.length; i++) {
+            if (i > 0 && sorted[i] - sorted[i - 1] > 1) result.push('...');
+            result.push(sorted[i]);
+          }
+          return result;
+        });
+        const goToLocalPage = (page) => {
+          const p = Math.max(1, Math.min(page, localTotalPages.value));
+          if (p === localCurrentPage.value) return;
+          localCurrentPage.value = p;
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+        // 搜索变化时重置页码
+        watch(localSearchQuery, () => { localCurrentPage.value = 1; });
         // 上传确认弹窗
         const uploadConfirmModal = ref({ show: false, team: null });
         // 删除确认弹窗
@@ -1419,6 +1506,7 @@
           if (viewTeam.value.isLocal) {
             localEditTeam.value = JSON.parse(JSON.stringify(viewTeam.value));
             localEditSnapshot.value = JSON.stringify(localEditTeam.value);
+            localEditSource.value = 'local';
             viewMode.value = 'localEdit';
           } else {
             // 广场队伍：先存为本地草稿副本再编辑
@@ -1437,6 +1525,7 @@
               localEditTeam.value = JSON.parse(JSON.stringify(draft));
             }
             localEditSnapshot.value = JSON.stringify(localEditTeam.value);
+            localEditSource.value = 'view';
             viewMode.value = 'localEdit';
           }
           window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1476,6 +1565,7 @@
           }
           viewMode.value = 'localEdit';
           localEditSnapshot.value = JSON.stringify(localEditTeam.value);
+          localEditSource.value = 'grid';
           window.scrollTo({ top: 0, behavior: 'smooth' });
         };
 
@@ -1510,9 +1600,10 @@
               leaveEditorModal.value = { show: true };
               return;
             }
-            viewMode.value = 'local';
+            viewMode.value = localEditSource.value || 'local';
             localEditTeam.value = null;
             localEditSnapshot.value = null;
+            localEditSource.value = 'local';
             closeLocalMenu();
             closeLocalCharSelect();
             return;
@@ -1533,9 +1624,10 @@
 
         const confirmLeaveEditor = () => {
           leaveEditorModal.value = { show: false };
-          viewMode.value = 'local';
+          viewMode.value = localEditSource.value || 'local';
           localEditTeam.value = null;
           localEditSnapshot.value = null;
+          localEditSource.value = 'local';
           closeLocalMenu();
           closeLocalCharSelect();
         };
@@ -1707,6 +1799,7 @@
             video: '', difficulty: '', modes: [], startup: [], loop: [],
             created_at: new Date().toISOString(), updated_at: new Date().toISOString()
           };
+          localEditSource.value = viewMode.value; // 记录来源（grid 或 local）
           viewMode.value = 'localEdit';
           localEditSnapshot.value = JSON.stringify(localEditTeam.value);
           window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1715,6 +1808,7 @@
         const editLocalTeam = (team) => {
           localEditTeam.value = JSON.parse(JSON.stringify(team));
           localEditSnapshot.value = JSON.stringify(localEditTeam.value);
+          localEditSource.value = 'local';
           viewMode.value = 'localEdit';
           window.scrollTo({ top: 0, behavior: 'smooth' });
         };
@@ -1787,6 +1881,13 @@
           showToast('已复制到本地队伍！视频链接不会一并复制。');
         };
 
+        // bilibili 链接校验
+        const isValidBilibiliUrl = (url) => {
+          if (!url || !url.trim()) return false;
+          return /^https?:\/\/(www\.|m\.)?bilibili\.com\/video\/(BV[a-zA-Z0-9]+|av\d+)/i.test(url.trim()) ||
+                 /^https?:\/\/b23\.tv\/[a-zA-Z0-9]+/i.test(url.trim());
+        };
+
         // 上传本地队伍到广场
         const uploadLocalTeam = () => {
           uploadConfirmModal.value = { show: true, team: localEditTeam.value };
@@ -1803,6 +1904,7 @@
           if (!t.difficulty) return showToast('请选择排轴难度', 'error');
           if (!t.modes || t.modes.length === 0) return showToast('请至少选择一个适用场景（深塔/海墟/矩阵）', 'error');
           if (!t.video || !t.video.trim()) return showToast('发布到广场需要填写参考视频链接', 'error');
+          if (!isValidBilibiliUrl(t.video)) return showToast('请填写有效的 Bilibili 视频链接（支持 bilibili.com 或 b23.tv 短链）', 'error');
           isSaving.value = true;
           const isUpdate = !!t._onlineId;
           let error;
@@ -2431,6 +2533,8 @@
           isGeneratingImage,
           // local teams
           localTeams, localEditTeam, activeLocalMenu, activeLocalCharSelectIdx,
+          localSearchQuery, localCurrentPage, localFilteredTeams, localPagedTeams,
+          localTotalPages, localPageNumbers, goToLocalPage, localEditSource,
           uploadConfirmModal, deleteConfirmModal, leaveEditorModal,
           DIFFICULTY_OPTIONS, MODE_OPTIONS, CHAR_BG_COLORS, CHAR_TEXT_COLORS, SKILLS,
           DIFFICULTY_COLORS, DIFFICULTY_TAG_COLORS, MODE_COLORS, MODE_TAG_COLORS,
@@ -2443,6 +2547,7 @@
           getFilterModeActiveClass, getFilterDiffActiveClass,
           openAdminModal, verifyAdmin, logoutAdmin, openAdminPanel, fetchReports, resolveReport,
           openReport, submitReport, relativeTime, absoluteTime, downloadAxisImage, copyAxisText,
+          isValidBilibiliUrl,
           // local team functions
           openLocalLibrary, createLocalTeam, editLocalTeam, saveLocalTeam, deleteLocalTeam,
           exportLocalTeams, importLocalTeams, copyTeamToLocal, uploadLocalTeam, confirmUpload,
