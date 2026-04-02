@@ -355,6 +355,10 @@
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
               {{ isGeneratingImage ? '生成中...' : '下载轴图' }}
             </button>
+            <button @click="copyAxisText(viewTeam)" class="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-500 hover:text-violet-600 hover:border-violet-300 text-xs font-semibold transition-all">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
+              复制轴序
+            </button>
           </div>
         </div>
 
@@ -386,7 +390,10 @@
               <div class="h-px flex-1 bg-slate-200/60"></div>
             </div>
             <div class="mobile-scroll">
-              <div v-if="viewTeam[axis].length === 0" class="text-slate-400 text-sm font-medium text-center py-4">轴为空</div>
+              <div v-if="viewTeam[axis].length === 0" class="flex flex-col items-center justify-center py-6 gap-1.5">
+                <svg class="w-8 h-8 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                <p class="text-xs text-slate-300 font-medium">作者暂未填写此轴</p>
+              </div>
               <div v-else class="flex flex-wrap content-start items-center min-h-[56px] w-full pb-2 rounded-xl bg-white border border-slate-200 p-3 sm:p-4 shadow-sm gap-y-2">
                 <template v-for="(element, index) in viewTeam[axis]" :key="element.id">
                   <!-- 角色切换箭头 -->
@@ -516,7 +523,7 @@
               <div class="h-px flex-1 bg-slate-200/60"></div>
             </div>
             <div class="mobile-scroll">
-              <draggable v-model="detailTeam[axis]" group="shared" item-key="id" :animation="150" class="flex flex-wrap content-start items-center min-h-[56px] w-full pb-2 rounded-xl bg-white border border-slate-200 p-3 sm:p-4 shadow-sm">
+              <draggable v-model="detailTeam[axis]" group="shared" item-key="id" :animation="150" class="relative flex flex-wrap content-start items-start w-full rounded-xl bg-white border border-slate-200 p-3 sm:p-4 shadow-sm" style="min-height:72.5px; padding-bottom:8px;">
                 <template #item="{ element, index }">
                   <div class="relative flex items-center shrink-0 group animate-pop mb-2 mt-1" style="cursor: grab">
                     <div v-if="index > 0 && element.charIdx !== detailTeam[axis][index-1].charIdx" class="flex items-center mx-2 shrink-0 select-none">
@@ -550,7 +557,9 @@
                   </div>
                 </template>
                 <template #footer>
-                  <div v-if="detailTeam[axis].length === 0" class="text-slate-400 text-xs sm:text-sm font-medium w-full text-center pointer-events-none py-1">轴为空，请在下方选择技能</div>
+                  <div v-if="detailTeam[axis].length === 0" class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <span class="text-slate-400 text-xs sm:text-sm font-medium">轴为空，请在下方选择技能</span>
+                  </div>
                 </template>
               </draggable>
             </div>
@@ -646,8 +655,27 @@
       </div>
     </div>
 
-    <!-- 上传确认弹窗 -->
-    <div v-if="uploadConfirmModal.show" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <!-- 离开编辑器确认弹窗 -->
+    <div v-if="leaveEditorModal.show" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" @click="cancelLeaveEditor"></div>
+      <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 animate-pop relative z-10">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+            <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"></path></svg>
+          </div>
+          <div>
+            <h3 class="text-lg font-bold text-slate-800">有未保存的改动</h3>
+            <p class="text-xs text-slate-400 font-medium mt-0.5">离开后改动将会丢失</p>
+          </div>
+        </div>
+        <div class="flex gap-3 mt-2">
+          <button @click="cancelLeaveEditor" class="flex-1 px-4 py-3 rounded-xl bg-slate-100 text-slate-600 font-bold text-sm hover:bg-slate-200 transition-colors">继续编辑</button>
+          <button @click="confirmLeaveEditor" class="flex-1 px-4 py-3 rounded-xl bg-amber-500 text-white font-bold text-sm hover:bg-amber-600 transition-colors shadow-md shadow-amber-100">放弃并离开</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 上传确认弹窗 -->    <div v-if="uploadConfirmModal.show" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" @click="uploadConfirmModal.show = false"></div>
       <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 sm:p-8 animate-pop relative z-10">
         <div class="flex items-center gap-3 mb-4">
@@ -825,7 +853,7 @@
               <div class="h-px flex-1 bg-slate-200/60"></div>
             </div>
             <div class="mobile-scroll">
-              <draggable v-model="localEditTeam[axis]" group="local-shared" item-key="id" :animation="150" class="flex flex-wrap content-start items-center min-h-[56px] w-full pb-2 rounded-xl bg-white border border-slate-200 p-3 sm:p-4 shadow-sm">
+              <draggable v-model="localEditTeam[axis]" group="local-shared" item-key="id" :animation="150" class="relative flex flex-wrap content-start items-start w-full rounded-xl bg-white border border-slate-200 p-3 sm:p-4 shadow-sm" style="min-height:72.5px; padding-bottom:8px;">
                 <template #item="{ element, index }">
                   <div class="relative flex items-center shrink-0 group animate-pop mb-2 mt-1" style="cursor: grab">
                     <div v-if="index > 0 && element.charIdx !== localEditTeam[axis][index-1].charIdx" class="flex items-center mx-2 shrink-0 select-none">
@@ -859,7 +887,9 @@
                   </div>
                 </template>
                 <template #footer>
-                  <div v-if="localEditTeam[axis].length === 0" class="text-slate-400 text-xs sm:text-sm font-medium w-full text-center pointer-events-none py-1">轴为空，请在下方选择技能</div>
+                  <div v-if="localEditTeam[axis].length === 0" class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <span class="text-slate-400 text-xs sm:text-sm font-medium">轴为空，请在下方选择技能</span>
+                  </div>
                 </template>
               </draggable>
             </div>
@@ -1141,12 +1171,15 @@
           localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(localTeams.value));
         };
         const localEditTeam = ref(null);
+        const localEditSnapshot = ref(null); // 进入编辑器时的初始快照，用于检测未保存改动
         const activeLocalMenu = ref({ axis: null, charIdx: null });
         const activeLocalCharSelectIdx = ref(null);
         // 上传确认弹窗
         const uploadConfirmModal = ref({ show: false, team: null });
         // 删除确认弹窗
         const deleteConfirmModal = ref({ show: false, type: null, id: null });
+        // 离开编辑器确认弹窗
+        const leaveEditorModal = ref({ show: false });
 
         const DIFFICULTY_COLORS = {
           '轮切轴': 'peer-checked:bg-emerald-500 peer-checked:border-emerald-500',
@@ -1358,6 +1391,7 @@
           if (!viewTeam.value) return;
           if (viewTeam.value.isLocal) {
             localEditTeam.value = JSON.parse(JSON.stringify(viewTeam.value));
+            localEditSnapshot.value = JSON.stringify(localEditTeam.value);
             viewMode.value = 'localEdit';
           } else {
             // 广场队伍：先存为本地草稿副本再编辑
@@ -1375,6 +1409,7 @@
               saveLocalTeamsToStorage();
               localEditTeam.value = JSON.parse(JSON.stringify(draft));
             }
+            localEditSnapshot.value = JSON.stringify(localEditTeam.value);
             viewMode.value = 'localEdit';
           }
           window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1413,6 +1448,7 @@
             localEditTeam.value = JSON.parse(JSON.stringify(draft));
           }
           viewMode.value = 'localEdit';
+          localEditSnapshot.value = JSON.stringify(localEditTeam.value);
           window.scrollTo({ top: 0, behavior: 'smooth' });
         };
 
@@ -1440,8 +1476,16 @@
 
         const backToGrid = () => {
           if (viewMode.value === 'localEdit') {
+            // 检测是否有未保存的改动
+            const hasUnsaved = localEditTeam.value && localEditSnapshot.value !== null &&
+              JSON.stringify(localEditTeam.value) !== localEditSnapshot.value;
+            if (hasUnsaved) {
+              leaveEditorModal.value = { show: true };
+              return;
+            }
             viewMode.value = 'local';
             localEditTeam.value = null;
+            localEditSnapshot.value = null;
             closeLocalMenu();
             closeLocalCharSelect();
             return;
@@ -1459,6 +1503,16 @@
           closeCharSelect();
           closeLocalMenu();
         };
+
+        const confirmLeaveEditor = () => {
+          leaveEditorModal.value = { show: false };
+          viewMode.value = 'local';
+          localEditTeam.value = null;
+          localEditSnapshot.value = null;
+          closeLocalMenu();
+          closeLocalCharSelect();
+        };
+        const cancelLeaveEditor = () => { leaveEditorModal.value = { show: false }; };
 
         const openCharSelect = (idx) => {
           activeCharSelectIdx.value = idx;
@@ -1496,8 +1550,15 @@
             ({ error } = await supabaseClient.from('teams').upsert(payload));
           }
           isSaving.value = false;
-          if (error) showToast('发布失败: ' + error.message, 'error');
-          else { showToast('发布成功！'); fetchTeams(); backToGrid(); }
+          if (error) { showToast('发布失败: ' + error.message, 'error'); return; }
+          showToast('发布成功！');
+          if (t.id) {
+            const idx = teams.value.findIndex(tm => tm.id === t.id);
+            if (idx >= 0) teams.value[idx] = { ...teams.value[idx], ...t, updated_at: new Date().toISOString() };
+          } else {
+            fetchTeams();
+          }
+          backToGrid();
         };
 
         // 自定义删除确认
@@ -1523,6 +1584,9 @@
             }
             if (!error) {
               teams.value = teams.value.filter(t => t.id !== id);
+              // 同步清理本地副本的 _onlineId（已下线）
+              const localIdx = localTeams.value.findIndex(lt => lt._onlineId === id);
+              if (localIdx >= 0) { localTeams.value[localIdx]._onlineId = null; saveLocalTeamsToStorage(); }
               showToast('删除成功');
               if (viewMode.value === 'view') backToGrid();
             } else showToast('删除失败: ' + error.message, 'error');
@@ -1617,11 +1681,13 @@
             created_at: new Date().toISOString(), updated_at: new Date().toISOString()
           };
           viewMode.value = 'localEdit';
+          localEditSnapshot.value = JSON.stringify(localEditTeam.value);
           window.scrollTo({ top: 0, behavior: 'smooth' });
         };
 
         const editLocalTeam = (team) => {
           localEditTeam.value = JSON.parse(JSON.stringify(team));
+          localEditSnapshot.value = JSON.stringify(localEditTeam.value);
           viewMode.value = 'localEdit';
           window.scrollTo({ top: 0, behavior: 'smooth' });
         };
@@ -1633,6 +1699,7 @@
           if (idx >= 0) localTeams.value[idx] = JSON.parse(JSON.stringify(localEditTeam.value));
           else localTeams.value.unshift(JSON.parse(JSON.stringify(localEditTeam.value)));
           saveLocalTeamsToStorage();
+          localEditSnapshot.value = JSON.stringify(localEditTeam.value); // 更新快照
           showToast('已保存到本地！');
           viewMode.value = 'local';
           window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1775,6 +1842,22 @@
           isSaving.value = false;
           if (error) return showToast((isUpdate ? '更新' : '发布') + '失败: ' + error.message, 'error');
           showToast(isUpdate ? '广场内容已更新！' : '已成功发布到广场！');
+          // 本地乐观更新 teams 列表，不全量刷新
+          if (isUpdate && finalOnlineId) {
+            const idx = teams.value.findIndex(tm => tm.id === finalOnlineId);
+            if (idx >= 0) {
+              teams.value[idx] = { ...teams.value[idx], ...t, id: finalOnlineId, updated_at: new Date().toISOString() };
+            }
+          } else if (finalOnlineId) {
+            // 新投稿：插入到列表头部
+            teams.value.unshift({
+              ...t, id: finalOnlineId,
+              author_id: deviceId,
+              likes: 0,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+          }
           if (!keepLocal) {
             localTeams.value = localTeams.value.filter(lt => lt.localId !== t.localId);
             saveLocalTeamsToStorage();
@@ -1786,7 +1869,6 @@
               saveLocalTeamsToStorage();
             }
           }
-          fetchTeams();
           viewMode.value = 'local';
           window.scrollTo({ top: 0, behavior: 'smooth' });
         };
@@ -1989,9 +2071,6 @@
               ctx.font = FONT_SECTION;
               ctx.fillStyle = '#334155';
               ctx.fillText(label, PAD + 14, y + 22);
-              ctx.fillStyle = '#94a3b8';
-              ctx.font = FONT_SM;
-              ctx.fillText(`${axisData.length} 步`, PAD + 14 + ctx.measureText(label).width + 10, y + 22);
 
               // 分隔线
               ctx.strokeStyle = '#e2e8f0';
@@ -2121,7 +2200,7 @@
               if (axisData.length === 0) {
                 ctx.font = FONT_SM;
                 ctx.fillStyle = '#94a3b8';
-                ctx.fillText('轴为空', PAD + 14, blockY0 + BLOCK_H / 2 + 4);
+                ctx.fillText('作者暂未填写此轴', PAD + 14, blockY0 + BLOCK_H / 2 + 4);
               }
 
               y += secH + 8;
@@ -2146,7 +2225,42 @@
           }
         };
 
-        // 辅助：圆角矩形（兼容不支持 roundRect 的浏览器）
+        const copyAxisText = (team) => {
+          const skillLabel = (el) => {
+            const base = el.skillKey === 'Custom' ? el.customText : (SKILLS[el.skillKey]?.axisLabel || el.skillKey);
+            const seg = el.seg > 0 ? el.seg : '';
+            const cnt = el.count > 1 ? `×${el.count}` : '';
+            return base + seg + cnt;
+          };
+          const renderAxis = (axisData, chars) => {
+            if (!axisData || axisData.length === 0) return '（空）';
+            let parts = [];
+            for (let i = 0; i < axisData.length; i++) {
+              const el = axisData[i];
+              const prev = axisData[i - 1];
+              const isFirst = i === 0;
+              const charSwitch = !isFirst && el.charIdx !== prev.charIdx;
+              if (isFirst) parts.push(`[${chars[el.charIdx] || '?'}] `);
+              else if (charSwitch) parts.push(` → [${chars[el.charIdx] || '?'}] `);
+              else parts.push(' ');
+              parts.push(skillLabel(el));
+            }
+            return parts.join('');
+          };
+          const lines = [
+            `【${team.name}】`,
+            `作者: ${team.author_name || '漂泊者'}  难度: ${team.difficulty}  模式: ${(team.modes || []).join('/')}`,
+            '',
+            `启动轴: ${renderAxis(team.startup, team.chars)}`,
+            `循环轴: ${renderAxis(team.loop, team.chars)}`,
+            '',
+            '— 来自鸣潮排轴广场'
+          ];
+          const text = lines.join('\n');
+          navigator.clipboard.writeText(text)
+            .then(() => showToast('轴序已复制到剪贴板！'))
+            .catch(() => showToast('复制失败，请手动复制', 'error'));
+        };
         function roundRect(ctx, x, y, w, h, r) {
           ctx.beginPath();
           ctx.moveTo(x + r, y);
@@ -2280,7 +2394,7 @@
           isGeneratingImage,
           // local teams
           localTeams, localEditTeam, activeLocalMenu, activeLocalCharSelectIdx,
-          uploadConfirmModal, deleteConfirmModal,
+          uploadConfirmModal, deleteConfirmModal, leaveEditorModal,
           DIFFICULTY_OPTIONS, MODE_OPTIONS, CHAR_BG_COLORS, CHAR_TEXT_COLORS, SKILLS,
           DIFFICULTY_COLORS, DIFFICULTY_TAG_COLORS, MODE_COLORS, MODE_TAG_COLORS,
           fetchTeams, createNewTeam, openView, openDetail, backToGrid,
@@ -2291,14 +2405,14 @@
           toggleFilterChar, toggleFilterMode, toggleFilterDiff, resetAllFilters,
           getFilterModeActiveClass, getFilterDiffActiveClass,
           openAdminModal, verifyAdmin, logoutAdmin, openAdminPanel, fetchReports, resolveReport,
-          openReport, submitReport, relativeTime, absoluteTime, downloadAxisImage,
+          openReport, submitReport, relativeTime, absoluteTime, downloadAxisImage, copyAxisText,
           // local team functions
           openLocalLibrary, createLocalTeam, editLocalTeam, saveLocalTeam, deleteLocalTeam,
           exportLocalTeams, importLocalTeams, copyTeamToLocal, uploadLocalTeam, confirmUpload,
           toggleLocalMenu, closeLocalMenu, addLocalSkill,
           openLocalCharSelect, closeLocalCharSelect, selectLocalChar,
           openLocalView, editFromView, editFromCard, deleteViewTeam, deleteLocalTeamFromEditor,
-          openDeleteConfirm, confirmDelete
+          openDeleteConfirm, confirmDelete, confirmLeaveEditor, cancelLeaveEditor
         };
       }
     });
