@@ -207,33 +207,18 @@
                 </button>
               </div>
             </div>
-            <!-- 模式 + 难度 同行 -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <div class="flex items-center justify-between mb-2">
-                  <span class="text-xs font-bold text-slate-500 tracking-wide">按模式筛选</span>
-                  <button v-if="filterModes.length > 0" @click="filterModes = []" class="text-[11px] text-slate-400 hover:text-slate-600 font-semibold transition-colors">清除</button>
-                </div>
-                <div class="flex flex-wrap gap-2">
-                  <button v-for="mode in MODE_OPTIONS" :key="mode" @click="toggleFilterMode(mode)"
-                    class="px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all"
-                    :class="filterModes.includes(mode) ? getFilterModeActiveClass(mode) : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'">
-                    {{ mode }}
-                  </button>
-                </div>
+            <!-- 难度筛选 -->
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-bold text-slate-500 tracking-wide">按难度筛选</span>
+                <button v-if="filterDiffs.length > 0" @click="filterDiffs = []" class="text-[11px] text-slate-400 hover:text-slate-600 font-semibold transition-colors">清除</button>
               </div>
-              <div>
-                <div class="flex items-center justify-between mb-2">
-                  <span class="text-xs font-bold text-slate-500 tracking-wide">按难度筛选</span>
-                  <button v-if="filterDiffs.length > 0" @click="filterDiffs = []" class="text-[11px] text-slate-400 hover:text-slate-600 font-semibold transition-colors">清除</button>
-                </div>
-                <div class="flex flex-wrap gap-2">
-                  <button v-for="diff in DIFFICULTY_OPTIONS" :key="diff" @click="toggleFilterDiff(diff)"
-                    class="px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all"
-                    :class="filterDiffs.includes(diff) ? getFilterDiffActiveClass(diff) : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'">
-                    {{ diff }}
-                  </button>
-                </div>
+              <div class="flex flex-wrap gap-2">
+                <button v-for="diff in DIFFICULTY_OPTIONS" :key="diff" @click="toggleFilterDiff(diff)"
+                  class="px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all"
+                  :class="filterDiffs.includes(diff) ? getFilterDiffActiveClass(diff) : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'">
+                  {{ diff }}
+                </button>
               </div>
             </div>
             <!-- 重置全部 -->
@@ -265,13 +250,6 @@
           <div class="flex items-center gap-2 mb-4">
             <span class="text-xs font-black px-3 py-1 rounded-lg border-2 tracking-wide" :class="DIFFICULTY_TAG_COLORS[team.difficulty] || 'bg-slate-50 text-slate-500 border-slate-200'">{{ team.difficulty }}</span>
             <span class="text-[11px] bg-slate-100 text-slate-500 px-2.5 py-1 rounded-lg font-semibold border border-slate-200">作者: {{ team.author_name }}</span>
-            <div class="flex flex-wrap gap-1.5 ml-auto">
-              <span v-for="mode in team.modes" :key="mode"
-                class="text-[10px] border px-1.5 py-0.5 rounded-md font-semibold"
-                :class="MODE_TAG_COLORS[mode] || 'bg-amber-50 text-amber-600 border-amber-100'">
-                {{ mode }}
-              </span>
-            </div>
           </div>
 
           <!-- 角色阵容 - 头像放大 -->
@@ -344,7 +322,6 @@
               <div class="flex flex-wrap items-center gap-2">
                 <span class="text-xs bg-slate-100 text-slate-500 px-2.5 py-1 rounded-lg font-semibold border border-slate-200">作者: {{ viewTeam.author_name }}</span>
                 <span class="text-xs px-2.5 py-1 rounded-lg font-semibold border" :class="DIFFICULTY_TAG_COLORS[viewTeam.difficulty] || 'bg-slate-50 text-slate-500 border-slate-200'">{{ viewTeam.difficulty }}</span>
-                <span v-for="mode in viewTeam.modes" :key="mode" class="text-xs border px-2.5 py-1 rounded-lg font-semibold" :class="MODE_TAG_COLORS[mode]">{{ mode }}</span>
                 <span class="text-xs text-slate-400 font-medium">发布于 {{ absoluteTime(viewTeam.created_at) }}</span>
               <span v-if="viewTeam.updated_at && viewTeam.updated_at !== viewTeam.created_at" class="text-xs text-slate-400 font-medium">· 更新于 {{ absoluteTime(viewTeam.updated_at) }}</span>
               </div>
@@ -505,15 +482,6 @@
                 <label v-for="diff in DIFFICULTY_OPTIONS" :key="diff" class="cursor-pointer">
                   <input type="radio" v-model="detailTeam.difficulty" :value="diff" class="hidden peer">
                   <div class="px-3 py-1.5 rounded-lg border text-sm font-semibold transition-colors border-slate-200 text-slate-600 bg-white hover:bg-slate-50 peer-checked:text-white" :class="DIFFICULTY_COLORS[diff]">{{ diff }}</div>
-                </label>
-              </div>
-            </div>
-            <div>
-              <label class="text-xs font-bold text-slate-500 mb-1 flex items-center gap-1">适用场景 (可多选)</label>
-              <div class="flex flex-wrap gap-2">
-                <label v-for="mode in MODE_OPTIONS" :key="mode" class="cursor-pointer" @click.stop>
-                  <input type="checkbox" v-model="detailTeam.modes" :value="mode" class="hidden peer">
-                  <div class="px-3 py-1.5 rounded-lg border text-sm font-semibold transition-colors border-slate-200 text-slate-600 bg-white hover:bg-slate-50 peer-checked:text-white" :class="MODE_COLORS[mode]">{{ mode }}</div>
                 </label>
               </div>
             </div>
@@ -770,13 +738,10 @@
             <h3 class="font-bold text-xl sm:text-2xl text-slate-800 truncate pr-2">{{ team.name || '(未命名)' }}</h3>
             <span class="text-[10px] text-slate-300 font-medium whitespace-nowrap shrink-0">{{ relativeTime(team.updated_at || team.created_at) }}</span>
           </div>
-          <!-- 难度 + 作者 + 模式（与大厅一致） -->
+          <!-- 难度 + 作者（与大厅一致） -->
           <div class="flex items-center gap-2 mb-4">
             <span class="text-xs font-black px-3 py-1 rounded-lg border-2 tracking-wide" :class="DIFFICULTY_TAG_COLORS[team.difficulty] || 'bg-slate-50 text-slate-500 border-slate-200'">{{ team.difficulty || '未设难度' }}</span>
             <span class="text-[11px] bg-slate-100 text-slate-500 px-2.5 py-1 rounded-lg font-semibold border border-slate-200">{{ team.author_name || '漂泊者' }}</span>
-            <div class="flex flex-wrap gap-1.5 ml-auto">
-              <span v-for="mode in (team.modes || [])" :key="mode" class="text-[10px] border px-1.5 py-0.5 rounded-md font-semibold" :class="MODE_TAG_COLORS[mode] || 'bg-amber-50 text-amber-600 border-amber-100'">{{ mode }}</span>
-            </div>
           </div>
           <!-- 角色阵容 -->
           <div class="flex gap-4 mb-5">
@@ -877,15 +842,6 @@
                 <label v-for="diff in DIFFICULTY_OPTIONS" :key="diff" class="cursor-pointer">
                   <input type="radio" v-model="localEditTeam.difficulty" :value="diff" class="hidden peer">
                   <div class="px-3 py-1.5 rounded-lg border text-sm font-semibold transition-colors border-slate-200 text-slate-600 bg-white hover:bg-slate-50 peer-checked:text-white" :class="DIFFICULTY_COLORS[diff]">{{ diff }}</div>
-                </label>
-              </div>
-            </div>
-            <div>
-              <label class="text-xs font-bold text-slate-500 mb-1 flex items-center gap-1">适用场景 (可多选)</label>
-              <div class="flex flex-wrap gap-2">
-                <label v-for="mode in MODE_OPTIONS" :key="mode" class="cursor-pointer" @click.stop>
-                  <input type="checkbox" v-model="localEditTeam.modes" :value="mode" class="hidden peer">
-                  <div class="px-3 py-1.5 rounded-lg border text-sm font-semibold transition-colors border-slate-200 text-slate-600 bg-white hover:bg-slate-50 peer-checked:text-white" :class="MODE_COLORS[mode]">{{ mode }}</div>
                 </label>
               </div>
             </div>
@@ -1157,7 +1113,6 @@
     };
     
     const DIFFICULTY_OPTIONS = ['轮切轴', '轮椅轴', '进阶轴', '高难轴'];
-    const MODE_OPTIONS = ['深塔', '海墟', '矩阵'];
 
     function getDeviceId() {
       let id = localStorage.getItem('mc_device_id');
@@ -1182,7 +1137,6 @@
         const sortOrder = ref('likes'); // 'likes' | 'newest'
         const filterPanelOpen = ref(false);
         const filterChars = ref([]);
-        const filterModes = ref([]);
         const filterDiffs = ref([]);
         const activeMenu = ref({ axis: null, charIdx: null });
         const activeCharSelectIdx = ref(null);
@@ -1303,28 +1257,6 @@
           '高难轴': 'bg-rose-50 text-rose-600 border-rose-300'
         };
 
-        const MODE_COLORS = {
-          '深塔': 'peer-checked:bg-purple-600 peer-checked:border-purple-600',
-          '海墟': 'peer-checked:bg-blue-900 peer-checked:border-blue-900',
-          '矩阵': 'peer-checked:bg-red-600 peer-checked:border-red-600'
-        };
-
-        const MODE_TAG_COLORS = {
-          '深塔': 'bg-purple-50 text-purple-600 border-purple-100',
-          '海墟': 'bg-blue-50 text-blue-900 border-blue-100',
-          '矩阵': 'bg-red-50 text-red-600 border-red-100'
-        };
-
-        // 筛选面板激活颜色（带背景）
-        const getFilterModeActiveClass = (mode) => {
-          const map = {
-            '深塔': 'bg-purple-600 border-purple-600 text-white',
-            '海墟': 'bg-blue-900 border-blue-900 text-white',
-            '矩阵': 'bg-red-600 border-red-600 text-white'
-          };
-          return map[mode] || 'bg-slate-800 border-slate-800 text-white';
-        };
-
         const getFilterDiffActiveClass = (diff) => {
           const map = {
             '轮切轴': 'bg-emerald-500 border-emerald-500 text-white',
@@ -1335,18 +1267,13 @@
           return map[diff] || 'bg-slate-800 border-slate-800 text-white';
         };
 
-        const hasActiveFilters = computed(() => filterChars.value.length > 0 || filterModes.value.length > 0 || filterDiffs.value.length > 0);
-        const activeFilterCount = computed(() => filterChars.value.length + filterModes.value.length + filterDiffs.value.length);
+        const hasActiveFilters = computed(() => filterChars.value.length > 0 || filterDiffs.value.length > 0);
+        const activeFilterCount = computed(() => filterChars.value.length + filterDiffs.value.length);
 
         const toggleFilterChar = (name) => {
           const i = filterChars.value.indexOf(name);
           if (i >= 0) filterChars.value.splice(i, 1);
           else filterChars.value.push(name);
-        };
-        const toggleFilterMode = (mode) => {
-          const i = filterModes.value.indexOf(mode);
-          if (i >= 0) filterModes.value.splice(i, 1);
-          else filterModes.value.push(mode);
         };
         const toggleFilterDiff = (diff) => {
           const i = filterDiffs.value.indexOf(diff);
@@ -1355,7 +1282,6 @@
         };
         const resetAllFilters = () => {
           filterChars.value = [];
-          filterModes.value = [];
           filterDiffs.value = [];
         };
 
@@ -1372,9 +1298,6 @@
           }
           if (filterChars.value.length > 0) {
             result = result.filter(t => filterChars.value.every(fc => t.chars.includes(fc)));
-          }
-          if (filterModes.value.length > 0) {
-            result = result.filter(t => filterModes.value.some(fm => t.modes && t.modes.includes(fm)));
           }
           if (filterDiffs.value.length > 0) {
             result = result.filter(t => filterDiffs.value.includes(t.difficulty));
@@ -1397,7 +1320,6 @@
             );
           }
           if (filterChars.value.length > 0) result = result.filter(t => filterChars.value.every(fc => t.chars.includes(fc)));
-          if (filterModes.value.length > 0) result = result.filter(t => filterModes.value.some(fm => t.modes && t.modes.includes(fm)));
           if (filterDiffs.value.length > 0) result = result.filter(t => filterDiffs.value.includes(t.difficulty));
           return result.length;
         });
@@ -1479,7 +1401,7 @@
         });
 
         // 筛选/排序变化时重置分页
-        watch([searchQuery, filterChars, filterModes, filterDiffs, sortOrder], () => {
+        watch([searchQuery, filterChars, filterDiffs, sortOrder], () => {
           currentPage.value = 1;
         }, { deep: true });
 
@@ -1487,7 +1409,7 @@
           detailTeam.value = {
             id: null, author_id: deviceId, author_name: '',
             name: '', chars: ['共鸣者1', '共鸣者2', '共鸣者3'], remark: '',
-            video: '', difficulty: '', modes: [], startup: [], loop: []
+            video: '', difficulty: '', startup: [], loop: []
           };
           viewMode.value = 'detail';
           window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1654,7 +1576,7 @@
             author_id: t.author_id, author_name: t.author_name || '漂泊者',
             name: t.name, chars: t.chars, remark: t.remark,
             video: t.video, difficulty: t.difficulty,
-            modes: t.modes, startup: t.startup, loop: t.loop
+            startup: t.startup, loop: t.loop
           };
           let error;
           if (isAdmin.value && t.id) {
@@ -1796,7 +1718,7 @@
             localId: 'local_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36),
             name: '', author_name: '',
             chars: ['共鸣者1', '共鸣者2', '共鸣者3'], remark: '',
-            video: '', difficulty: '', modes: [], startup: [], loop: [],
+            video: '', difficulty: '', startup: [], loop: [],
             created_at: new Date().toISOString(), updated_at: new Date().toISOString()
           };
           localEditSource.value = viewMode.value; // 记录来源（grid 或 local）
@@ -1871,7 +1793,6 @@
             chars: [...(team.chars || ['共鸣者1','共鸣者2','共鸣者3'])],
             remark: '', video: '',
             difficulty: team.difficulty || '',
-            modes: [...(team.modes || [])],
             startup: JSON.parse(JSON.stringify(team.startup || [])),
             loop: JSON.parse(JSON.stringify(team.loop || [])),
             created_at: new Date().toISOString(), updated_at: new Date().toISOString()
@@ -1902,7 +1823,6 @@
           const unsetChars = (t.chars || []).filter(c => !c || defaultCharNames.includes(c));
           if (unsetChars.length > 0) return showToast('请为所有角色槽位选择角色', 'error');
           if (!t.difficulty) return showToast('请选择排轴难度', 'error');
-          if (!t.modes || t.modes.length === 0) return showToast('请至少选择一个适用场景（深塔/海墟/矩阵）', 'error');
           if (!t.video || !t.video.trim()) return showToast('发布到广场需要填写参考视频链接', 'error');
           if (!isValidBilibiliUrl(t.video)) return showToast('请填写有效的 Bilibili 视频链接（支持 bilibili.com 或 b23.tv 短链）', 'error');
           isSaving.value = true;
@@ -1916,7 +1836,7 @@
               id: t._onlineId, author_id: deviceId,
               name: t.name, author_name: t.author_name || '漂泊者',
               chars: t.chars, remark: t.remark, video: t.video,
-              difficulty: t.difficulty, modes: t.modes,
+              difficulty: t.difficulty,
               startup: t.startup, loop: t.loop
             };
             const { data: rowCount, error: updateError } = await supabaseClient.rpc('author_update_team', { p_team: payload });
@@ -1928,7 +1848,7 @@
                 author_id: deviceId, author_name: t.author_name || '漂泊者',
                 name: t.name, chars: t.chars, remark: t.remark,
                 video: t.video, difficulty: t.difficulty,
-                modes: t.modes, startup: t.startup, loop: t.loop
+                startup: t.startup, loop: t.loop
               };
               const { data: newData, error: insertError } = await supabaseClient
                 .from('teams').insert(insertPayload).select('id').single();
@@ -1949,7 +1869,7 @@
               author_id: deviceId, author_name: t.author_name || '漂泊者',
               name: t.name, chars: t.chars, remark: t.remark,
               video: t.video, difficulty: t.difficulty,
-              modes: t.modes, startup: t.startup, loop: t.loop
+              startup: t.startup, loop: t.loop
             };
             const { data, error: insertError } = await supabaseClient
               .from('teams').insert(payload).select('id').single();
@@ -2387,7 +2307,7 @@
           };
           const lines = [
             `【${team.name}】`,
-            `作者: ${team.author_name || '漂泊者'}  难度: ${team.difficulty}  模式: ${(team.modes || []).join('/')}`,
+            `作者: ${team.author_name || '漂泊者'}  难度: ${team.difficulty}`,
             '',
             `启动轴: ${renderAxis(team.startup, team.chars)}`,
             `循环轴: ${renderAxis(team.loop, team.chars)}`,
@@ -2523,7 +2443,7 @@
 
         return {
           deviceId, teams, filteredAndSortedTeams, viewMode, detailTeam, viewTeam,
-          searchQuery, sortOrder, filterPanelOpen, filterChars, filterModes, filterDiffs,
+          searchQuery, sortOrder, filterPanelOpen, filterChars, filterDiffs,
           hasActiveFilters, activeFilterCount, allCharOptions,
           activeMenu, activeCharSelectIdx, charSearchQuery, filteredCharOptions,
           activeStepSegId, isLoading, isSaving, isLoadingMore, noMoreData,
@@ -2536,15 +2456,15 @@
           localSearchQuery, localCurrentPage, localFilteredTeams, localPagedTeams,
           localTotalPages, localPageNumbers, goToLocalPage, localEditSource,
           uploadConfirmModal, deleteConfirmModal, leaveEditorModal,
-          DIFFICULTY_OPTIONS, MODE_OPTIONS, CHAR_BG_COLORS, CHAR_TEXT_COLORS, SKILLS,
-          DIFFICULTY_COLORS, DIFFICULTY_TAG_COLORS, MODE_COLORS, MODE_TAG_COLORS,
+          DIFFICULTY_OPTIONS, CHAR_BG_COLORS, CHAR_TEXT_COLORS, SKILLS,
+          DIFFICULTY_COLORS, DIFFICULTY_TAG_COLORS,
           fetchTeams, createNewTeam, openView, openDetail, backToGrid,
           publishTeam, deleteTeam, hasLiked, toggleLike, getAvatar, handleImgError,
           toggleMenu, closeMenu, addSkill, adjustCount, removeStep,
           openCharSelect, closeCharSelect, selectChar, toggleSegBubble, setSegment,
           confirmCustom, cancelCustom,
-          toggleFilterChar, toggleFilterMode, toggleFilterDiff, resetAllFilters,
-          getFilterModeActiveClass, getFilterDiffActiveClass,
+          toggleFilterChar, toggleFilterDiff, resetAllFilters,
+          getFilterDiffActiveClass,
           openAdminModal, verifyAdmin, logoutAdmin, openAdminPanel, fetchReports, resolveReport,
           openReport, submitReport, relativeTime, absoluteTime, downloadAxisImage, copyAxisText,
           isValidBilibiliUrl,
